@@ -1,0 +1,5 @@
+platform,num_qubits,depth,size,ops_per_gate,ops_1q,ops_2q,ops_3q,ops_other,naive_total_time_s
+spin_qubit_intel_2024,12,161,481,"{'rz': 161, 'cx': 149, 'ry': 91, 'rx': 53, 'cz': 27}",305,176,0,0,4.240000000000001e-05
+superconducting_google_willow_2024,10,118,319,"{'rz': 145, 'cx': 136, 'sx': 34, 'x': 4}",183,136,0,0,2.8149999999999996e-05
+trapped_ion_oxford_2024,10,63,209,"{'rz': 99, 'cx': 90, 'ry': 10, 'rx': 10}",119,90,0,0,0.00015999999999999999
+neutral_atom_aws_2023,10,63,209,"{'rz': 99, 'cx': 90, 'ry': 10, 'rx': 10}",119,90,0,0,0.00058

@@ -1,0 +1,3 @@
+label,stage,num_qubits,num_clbits,depth,size,num_1q_ops,num_2qplus_ops,num_measure,num_reset,num_barrier,op_counts_json,op_counts_1q_json,op_counts_2qplus_json
+MSQLBM_32x32_v4x4_specular_obstacles,logical,20,0,30093,68016,26432,41584,0,0,0,"{""cx"": 22, ""h"": 15024, ""cp"": 34080, ""swap"": 6816, ""mcphase"": 240, ""x"": 4016, ""p"": 7392, ""mcmt"": 426}","{""h"": 15024, ""x"": 4016, ""p"": 7392}","{""cx"": 22, ""cp"": 34080, ""swap"": 6816, ""mcphase"": 240, ""mcmt"": 426}"
+MSQLBM_32x32_v4x4_specular_obstacles,transpiled,20,0,187288,394304,255638,138666,0,0,0,"{""rz"": 212704, ""sx"": 41234, ""cx"": 138666, ""x"": 1700}","{""rz"": 212704, ""sx"": 41234, ""x"": 1700}","{""cx"": 138666}"
