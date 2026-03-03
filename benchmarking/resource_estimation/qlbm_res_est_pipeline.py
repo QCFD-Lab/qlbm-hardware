@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-"""
-Resource-estimation pipeline for a MSQLBM circuit.
-
-Usage:
-  python qlbm_resource_pipeline.py --outdir qlbm-hardware-output/resource-estimates
-  python qlbm_resource_pipeline.py --transpile --opt-level 1
-  python qlbm_resource_pipeline.py --transpile --basis "rz,sx,x,cx,measure,reset,barrier"
-"""
 
 from __future__ import annotations
 
@@ -43,6 +34,18 @@ def build_lattice_2d() -> MSLattice:
         }
     )
     return lattice_2d
+
+def build_lattice_3d_8_no_obstacles() -> MSLattice:
+    lattice_3d = MSLattice(
+        {
+            "lattice": {
+                "dim": {"x": 8, "y": 8, "z": 8},
+                "velocities": {"x": 4, "y": 4, "z": 4},
+            },
+            "geometry": [],
+        }
+    )
+    return lattice_3d
 
 
 def build_msqlbm_circuit(lattice: MSLattice) -> QuantumCircuit:
@@ -123,17 +126,12 @@ def summarize_circuit(qc: QuantumCircuit, label: str, stage: str) -> CircuitReso
     )
 
 
-def transpile_circuit(
-    qc: QuantumCircuit,
-    opt_level: int,
-    basis_gates: Optional[list[str]] = None,
-) -> QuantumCircuit:
+def transpile_circuit(qc, opt_level, basis_gates: Optional[list[str]] = None) -> QuantumCircuit:
     """
-    Generic transpilation (no backend). Useful to see how counts/depth change
-    under different bases and optimization levels.
+    Generic transpilation with no backend.
+    USed to see how metrics change under different bases and optimization levels.
     """
     if basis_gates is not None:
-        # Qiskit does not allow non-standard instructions like "barrier" in basis_gates.
         basis_gates = [g for g in basis_gates if g != "barrier"]
     tc = transpile(
         qc,
@@ -175,8 +173,8 @@ def flatten_resources_for_csv(r: CircuitResources) -> Dict[str, Any]:
     }
 
 def main() -> None:
-    outdir = Path("../../resource-estimates/test_msqlbm_resource-estimates")
-    label = "MSQLBM_32x32_v4x4_specular_obstacles"
+    outdir = Path("../../qlbm-hardware-output/resource-estimates/test_msqlbm_resource-estimates")
+    label = "MSQLBM_3D_8x8x8_v4x4x4_no_obstacles"
 
     enable_transpile = True    # set False to skip transpilation
     optimization_level = 1    # 0,1,2,3
@@ -185,7 +183,8 @@ def main() -> None:
 
     ensure_outdir(outdir)
 
-    lattice = build_lattice_2d()
+    # lattice = build_lattice_2d()
+    lattice = build_lattice_3d_8_no_obstacles()
     qc = build_msqlbm_circuit(lattice)
 
     logical = summarize_circuit(qc, label=label, stage="logical")
@@ -193,18 +192,10 @@ def main() -> None:
     results = {
         "label": label,
         "lattice": {
-            "dim": {"x": 32, "y": 32},
-            "velocities": {"x": 4, "y": 4},
-            "geometry_count": 7,
-            "geometry": [
-                {"shape": "cuboid", "x": [18, 19], "y": [7, 14], "boundary": "specular"},
-                {"shape": "cuboid", "x": [18, 19], "y": [19, 26], "boundary": "specular"},
-                {"shape": "cuboid", "x": [26, 27], "y": [19, 26], "boundary": "specular"},
-                {"shape": "cuboid", "x": [26, 27], "y": [7, 14], "boundary": "specular"},
-                {"shape": "cuboid", "x": [20, 25], "y": [4, 5], "boundary": "specular"},
-                {"shape": "cuboid", "x": [20, 25], "y": [16, 17], "boundary": "specular"},
-                {"shape": "cuboid", "x": [20, 25], "y": [28, 29], "boundary": "specular"},
-            ],
+            "dim": {"x": 8, "y": 8, "z": 8},
+            "velocities": {"x": 4, "y": 4, "z": 4},
+            "geometry_count": 0,
+            "geometry": [],
         },
         "qiskit": {
             "transpile": {

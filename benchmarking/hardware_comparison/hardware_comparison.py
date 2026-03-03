@@ -337,6 +337,6 @@ if __name__ == "__main__":
     pd.set_option("display.width", 120)
     print(df_results)
 
-    output_path = "../../output/msqlbm_2d_32x32_3_obs_hw_comp.csv"
+    output_path = "../../qlbm-hardware-output/output/msqlbm_2d_32x32_3_obs_hw_comp.csv"
     df_results.to_csv(output_path, index=False)
     print(f"\nSaved results to {output_path}")

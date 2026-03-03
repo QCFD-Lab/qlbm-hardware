@@ -264,7 +264,7 @@ def debug_tensor_factors_basic(backends: Dict[str, object]) -> pd.DataFrame:
 
 
 def main():
-    ROOT = Path("../../resource-estimates")
+    ROOT = Path("../../qlbm-hardware-output/resource-estimates")
     create_directory_and_parents(str(ROOT))
 
     lattice_2d = MSLattice(
