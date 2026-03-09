@@ -59,8 +59,7 @@ def build_msqlbm_circuit(lattice: MSLattice) -> QuantumCircuit:
 
 def _count_ops_by_arity(qc: QuantumCircuit) -> Tuple[Dict[str, int], Dict[str, int], Dict[str, int]]:
     """
-    Returns (all_ops, ops_1q, ops_2qplus) as name->count dicts.
-    Note: counts are based on instruction arity in qc.data.
+    Returns (all_ops, ops_1q, ops_2qplus) as name->count dicts
     """
     all_ops: Dict[str, int] = {}
     ops_1q: Dict[str, int] = {}
@@ -128,8 +127,8 @@ def summarize_circuit(qc: QuantumCircuit, label: str, stage: str) -> CircuitReso
 
 def transpile_circuit(qc, opt_level, basis_gates: Optional[list[str]] = None) -> QuantumCircuit:
     """
-    Generic transpilation with no backend.
-    USed to see how metrics change under different bases and optimization levels.
+    Generic transpilation with no backend
+    USed to see how metrics change under different bases and optimization levels
     """
     if basis_gates is not None:
         basis_gates = [g for g in basis_gates if g != "barrier"]

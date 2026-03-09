@@ -55,10 +55,10 @@ def make_qft_circuit(num_qubits: int) -> QuantumCircuit:
 # -------------------------------------------------------------------
 
 # Assumed schema:
-# - num_qubits  : number of qubits you will actually use for the benchmark
-# - basis_gates : list of physical basis gates for that platform
-# - coupling_map  : list of directed edges [control, target] or None for full connectivity
-# - gate_times : dict { gate_name: gate_duration_in_seconds } (optional for timing)
+# - num_qubits: number of qubits you will use for the benchmark
+# - basis_gates: list of physical basis gates for that platform
+# - coupling_map: list of directed edges [control, target] or None for full connectivity
+# - gate_times : optional dict { gate_name: gate_duration_in_seconds }
 #
 
 linear_edges = []
@@ -85,8 +85,8 @@ def make_linear_chain_edges(num_qubits: int):
 
 def make_2d_grid_edges(rows: int, cols: int):
     """
-    2D nearest-neighbour grid (rows x cols), bidirectional edges.
-    Qubit index = r*cols + c.
+    2D nearest-neighbour grid, bidirectional edges
+    Qubit index = r*cols + c
     """
     edges = []
     for r in range(rows):
@@ -107,41 +107,41 @@ def make_2d_grid_edges(rows: int, cols: int):
 benchmark_num_qubits = 20
 
 platforms = {
-    # "spin_qubit_intel_2024": {
-    #     "id": "intel 2024",
-    #     "architecture": "silicon spin qubit (Si/SiGe quantum dots)",
-    #     "device_name": "Tunnel Falls 12QD device",
-    #     "year_reported": 2024,
-    #     "num_qubits": benchmark_num_qubits,  # physical_qubit_count = 12
-    #     # Single-qubit: EDSR-driven rotations -> Rx/Ry/Rz
-    #     # Two-qubit: exchange-based gate -> approximate as CZ/CX for transpilation
-    #     "basis_gates": ["rz", "rx", "ry", "cz", "cx"],
-    #     # Linear nn array (here defined for 12 but extra nodes unused if num_qubits < 12
-    #     "coupling_map": make_linear_chain_edges(num_qubits=12),
-    #     # IMPORTANT NOTE!!!! very rough average, gate duration varies drastically, increasing the
-    #     # number of qubits increases gate times
-    #     "gate_times": {
-    #         "rz": 0.0,
-    #         "rx": 50e-9,  # 50 ns
-    #         "ry": 50e-9,
-    #         "cz": 200e-9,  # 200 ns two-qubit (or swap/entangler)
-    #         "cx": 200e-9,
-    #     },
-    # },
+    "spin_qubit_intel_2024": {
+        "id": "intel 2024",
+        "architecture": "silicon spin qubit (Si/SiGe quantum dots)",
+        "device_name": "Tunnel Falls 12QD device",
+        "year_reported": 2024,
+        "num_qubits": benchmark_num_qubits,  # physical_qubit_count = 12
+        # Single-qubit: EDSR-driven rotations -> Rx/Ry/Rz
+        # Two-qubit: exchange-based gate -> approximate as CZ/CX for transpilation
+        "basis_gates": ["rz", "rx", "ry", "cz", "cx"],
+        # Linear nn array (here defined for 12 but extra nodes unused if num_qubits < 12
+        "coupling_map": make_linear_chain_edges(num_qubits=12),
+        # IMPORTANT NOTE!!!! very rough average, gate duration varies drastically, increasing the
+        # number of qubits increases gate times
+        "gate_times": {
+            "rz": 0.0,
+            "rx": 50e-9,  # 50 ns
+            "ry": 50e-9,
+            "cz": 200e-9,  # 200 ns two-qubit (or swap/entangler)
+            "cx": 200e-9,
+        },
+    },
     "superconducting_google_willow_2024": {
         "id": "google willow 2024",
         "architecture": "superconducting transmon",
         "device_name": "Willow",
         "year_reported": 2024,
         "num_qubits": benchmark_num_qubits,
-        # Willow is transmon so Qiskit native basis is can be used
-        # (Exact native gates not reported in the paper; these are the standard ones
+        # Willow is transmon so Qiskit native basis can be used
+        # (Exact native gates not reported in the paper, these are the standard ones
         #  used for Google's previous hardware and are fully compatible with routing)
         "basis_gates": ["rz", "sx", "x", "cx"],
 
-        # Willow physical layouts are 72 and 105 qubit square grids.
+        # Willow physical layouts are 72 and 105 qubit square grids
         # For benchmarking, embed a small 2D grid subset (2 × 5 = 10 qubits)
-        # so routing behaviour matches planar nearest-neighbour constraints.
+        # so routing behaviour matches planar nearest-neighbour constraints
         "coupling_map": make_2d_grid_edges(rows=5, cols=20),
 
         # NOTE: fairly standard numbers but still averages across fixed-frequency transmon processors

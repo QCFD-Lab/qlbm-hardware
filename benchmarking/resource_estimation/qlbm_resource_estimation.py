@@ -169,18 +169,14 @@ def compile_with_qiskit(circuit, backend, opt_level: int = 0):
 
 def compile_with_tket(circuit, backend):
     """
-    Compiles using TKET, then returns a Qiskit circuit scheduled for the backend.
+    Compiles using TKET, then returns a Qiskit circuit scheduled for the backend
     """
-    # 1) Get backend coupling
     edges = get_coupling_edges(backend)
 
-    # 2) Fully decompose Qiskit boxes/controlled wrappers so the converter
-    #    does not emit QControlBox for arbitrary controlled ops.
-    #    The `reps` argument recursively decomposes up to N levels.
+    #  The reps argument recursively decomposes up to N levels
     qc_in = circuit.decompose(reps=10)
 
-    # 3) Unroll to a TKET‑friendly gate set to stabilise conversion.
-    #    This avoids exotic instructions that trigger QControlBox arity issues.
+    # This avoids instructions that trigger QControlBox arity issues
     tket_basis = [
         "id", "x", "y", "z", "s", "sdg", "t", "tdg", "sx",
         "rx", "ry", "rz", "p", "cx", "cz", "swap", "ccx", "cswap",
@@ -188,23 +184,22 @@ def compile_with_tket(circuit, backend):
     ]
     qc_in = transpile(qc_in, basis_gates=tket_basis, optimization_level=0)
 
-    # 4) Convert to TKET and run a light optimisation + mapping.
+    # Convert to TKET and run basic optimisation and mapping
     tk_circ = qiskit_to_tk(qc_in)
     passes = [DecomposeBoxes(), FullPeepholeOptimise()]
     if edges:
         passes.append(DefaultMappingPass(Architecture(edges)))
     SequencePass(passes).apply(tk_circ)
 
-    # 5) Convert back to Qiskit and check against target backend basis.
     qc = tk_to_qiskit(tk_circ)
     return transpile(qc, backend=backend, optimization_level=0)
 
 
 def debug_tensor_factors_basic(backends: Dict[str, object]) -> pd.DataFrame:
     """
-    Small sanity check for Qiskit's num_tensor_factors vs backend size.
+    Small sanity check for Qiskit's num_tensor_factors vs backend size
 
-    For each backend, run ResourceEstimation on a few toy circuits:
+    For each backend, run ResourceEstimation on a few circuits:
       - 2q separable (H on both qubits)
       - 2q entangled (Bell pair)
       - 3q with only one active qubit (two idle wires)
@@ -214,19 +209,19 @@ def debug_tensor_factors_basic(backends: Dict[str, object]) -> pd.DataFrame:
 
     tests: Dict[str, QuantumCircuit] = {}
 
-    # 1) Two-qubit product state: |++> = H tensor H, no entanglement.
+    # Two-qubit product state |++> = H tensor H, no entanglement
     qc_prod2 = QuantumCircuit(2, name="prod_2q_HH")
     qc_prod2.h(0)
     qc_prod2.h(1)
     tests["prod_2q_HH"] = qc_prod2
 
-    # 2) Two-qubit Bell state: |phi+> = (|00> + |11>)/sqrt(2), entangled.
+    # Two-qubit Bell state  |phi+> = (|00> + |11>)/sqrt(2), entangled
     qc_bell = QuantumCircuit(2, name="ent_2q_bell")
     qc_bell.h(0)
     qc_bell.cx(0, 1)
     tests["ent_2q_bell"] = qc_bell
 
-    # 3) Three-qubit circuit where only q0 is used; q1 and q2 stay idle.
+    # three-qubit circuit where only q0 is used, q1 and q2 stay idle
     qc_idle = QuantumCircuit(3, name="idle_3q_only_q0_used")
     qc_idle.h(0)
     tests["idle_3q_only_q0_used"] = qc_idle
