@@ -4,7 +4,7 @@
     "architecture": "silicon spin qubit (Si/SiGe quantum dots)",
     "device_name": "Tunnel Falls 12QD device",
     "year_reported": 2024,
-    "num_qubits": 20,
+    "num_qubits": 12,
     "basis_gates": ["rz", "rx", "ry", "cz", "cx"],
     "coupling_type": "linear_chain",
     "coupling_params": {
@@ -23,7 +23,7 @@
     "architecture": "superconducting transmon",
     "device_name": "Willow",
     "year_reported": 2024,
-    "num_qubits": 20,
+    "num_qubits": 105,
     "basis_gates": ["rz", "sx", "x", "cx"],
     "coupling_type": "2d_grid",
     "coupling_params": {

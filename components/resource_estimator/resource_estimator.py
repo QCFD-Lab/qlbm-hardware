@@ -2,6 +2,7 @@ from qiskit import QuantumCircuit, transpile
 from qiskit.transpiler import CouplingMap
 from collections import Counter
 from typing import Dict, Any, Optional, List
+import warnings
 
 
 class ResourceEstimator:
@@ -216,13 +217,24 @@ class ResourceEstimator:
             seed_transpiler: Seed for transpiler (optional).
             
         Returns:
-            Dictionary of metrics.
+            Dictionary containing the metrics and the transpiled circuit.
         """
+        platform_num_qubits = self.hardware_config.get("num_qubits", float("inf"))
+
         transpiled_circuit = self.transpile_for_platform(
             circuit,
             optimization_level=optimization_level,
             seed_transpiler=seed_transpiler,
         )
-        
-        metrics = self.extract_metrics(transpiled_circuit)
-        return metrics
+
+        if transpiled_circuit.num_qubits > platform_num_qubits:
+           print(f"WARNING: Circuit requires {transpiled_circuit.num_qubits} qubits, but the platform only supports "
+                f"{platform_num_qubits} qubits. Transpilation may fail or produce incorrect results.\n",
+            )
+
+        result = {
+            "metrics": self.extract_metrics(transpiled_circuit),
+            "transpiled_circuit": transpiled_circuit,
+        }
+
+        return result
