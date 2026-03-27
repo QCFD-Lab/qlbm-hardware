@@ -1,31 +1,32 @@
 import numpy as np
 import networkx as nx
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional, Union
 from qiskit import QuantumCircuit
-
+from qiskit.circuit import ParameterExpression
 
 class PhasePolyOptimizer:
     """
-    A class to find and optimize maximal non-overlapping phase polynomial blocks in a Qiskit circuit.
-    A phase polynomial block consists only of CNOT and Rz gates.
+    Finds and optimises maximal non‑overlapping phase‑polynomial blocks in a Qiskit circuit.
+    A phase‑polynomial block consists only of CNOT and single‑qubit Rz gates.
     """
 
     def __init__(self, circuit: QuantumCircuit):
         self.circuit = circuit
-        self.blocks = []  # List of (start_index, end_index, qubits, gates)
+        self.blocks = []  # list of (start_idx, end_idx, qubits, gates)
 
     def find_blocks(self) -> List[Tuple[int, int, List[int], List]]:
         """
-        Finds all maximal non-overlapping phase polynomial blocks in the circuit.
+        Finds all maximal non‑overlapping phase‑polynomial blocks.
 
         Returns:
-            List of tuples (start_index, end_index, qubits, gates) for each block.
+            List of tuples (start_index, end_index, qubit_indices, gate_list)
+            where gate_list contains (gate, qargs) for each gate in the block.
         """
         blocks = []
         current_block = None
         for i, (gate, qargs, _) in enumerate(self.circuit.data):
             if gate.name == 'cx' or gate.name == 'rz':
-                # Convert qargs to integer indices
+                # Convert Qubit objects to integer indices
                 indices = [self.circuit.find_bit(q)[0] for q in qargs]
                 if current_block is None:
                     current_block = {
@@ -62,11 +63,11 @@ class PhasePolyOptimizer:
         Extracts a subcircuit for the phase polynomial block.
 
         Args:
-            start: Start index of the block in the original circuit.
-            end: End index of the block in the original circuit.
+            start: start instruction index
+            end:   end instruction index (inclusive)
 
         Returns:
-            A new QuantumCircuit containing only the gates in the block.
+            A QuantumCircuit containing only the gates of the block.
         """
         subcircuit = QuantumCircuit(*self.circuit.qregs)
         for i in range(start, end + 1):
@@ -75,7 +76,12 @@ class PhasePolyOptimizer:
 
     def _extract_parity_table(self, block: QuantumCircuit) -> Tuple[np.ndarray, List[float]]:
         """
-        Extracts the parity table from a block of CNOT and Rz gates.
+        Extract the parity table and the corresponding angles from a block
+        that consists only of CNOT and Rz gates.
+
+        Returns:
+            P: binary matrix of shape (n, m) where each column is a parity
+            angles: list of floats, same length as number of columns
         """
         n = block.num_qubits
         # M: current linear mapping, initially identity
@@ -91,7 +97,7 @@ class PhasePolyOptimizer:
                 qubit = block.find_bit(qargs[0])[0]
                 # Get the parity vector for this qubit
                 parity = tuple(M[qubit])  # convert to tuple for hashing
-                angle = float(gate.params[0])  # assume parameter is a float (or sympy)
+                angle = gate.params[0]  # keep symbolic if present
                 if parity in parity_dict:
                     parity_dict[parity] += angle
                 else:
@@ -110,122 +116,145 @@ class PhasePolyOptimizer:
 
     def _choose_parity(self, P: np.ndarray) -> Tuple[int, np.ndarray]:
         """
-        Chooses the parity with minimal Hamming weight.
-
-        Args:
-            P: Parity table.
-
-        Returns:
-            Index of the chosen parity and the parity itself.
+        Choose the parity with minimal Hamming weight. Tie‑break by smallest
+        integer representation (treating the column as binary with qubit 0 as LSB).
         """
-        pass
+        weights = np.sum(P, axis=0)          # shape (m,)
+        min_weight = np.min(weights)
+        candidates = np.where(weights == min_weight)[0]
+        # Compute integer value for each candidate column
+        powers = 1 << np.arange(P.shape[0])
+        int_vals = (P.T @ powers)           # shape (m,)f
+        best_idx = candidates[np.argmin(int_vals[candidates])]
+        return best_idx, P[:, best_idx]
 
     def _build_parity_graph(self, y: np.ndarray, P: np.ndarray) -> nx.DiGraph:
         """
-        Builds the parity graph G_y for a given parity y.
-
-        Args:
-            y: Parity to synthesize.
-            P: Parity table.
-
-        Returns:
-            Directed graph G_y with weights.
+        Build the directed parity graph G_y for the given parity y and current parity table.
+        Vertices are indices where y has a 1. Edge weight from i to j is
+            h(P[i] XOR P[j]) - h(P[j]).
         """
         vertices = [i for i, val in enumerate(y) if val]
         G = nx.DiGraph()
         G.add_nodes_from(vertices)
-
         for i in vertices:
             for j in vertices:
                 if i != j:
-                    # Weight: h(P_i XOR P_j) - h(P_j)
                     weight = np.sum(P[i] ^ P[j]) - np.sum(P[j])
                     G.add_edge(i, j, weight=weight)
-
         return G
 
     def _find_min_weight_arborescence(self, G: nx.DiGraph) -> nx.DiGraph:
         """
-        Finds the minimum weight spanning arborescence in G.
-
-        Args:
-            G: Directed graph.
-
-        Returns:
-            Minimum weight spanning arborescence.
+        Find a minimum weight spanning arborescence (optimum branching) in the directed graph.
         """
-        # Tarjan's algorithm for minimum spanning arborescence
+        # NetworkX's minimum_spanning_arborescence returns a branching (a forest).
+        # For a complete directed graph it will be a single arborescence.
         return nx.algorithms.tree.branchings.minimum_spanning_arborescence(G)
 
-    def _synthesize_block_all_to_all(self, P: np.ndarray) -> Tuple[np.ndarray, List[Tuple[int, int]]]:
+    def synthesize_all_to_all(self, P: np.ndarray, angles: List[float]) -> QuantumCircuit:
         """
-        Synthesizes a phase polynomial block with all-to-all connectivity.
+        Synthesise a phase polynomial using the all‑to‑all algorithm (Algorithm 1 of the paper).
 
         Args:
-            P: Parity table.
+            P: parity table (n x m)
+            angles: list of angles, same length as columns of P
 
         Returns:
-            Updated parity table and list of CNOT gates (control, target).
+            A QuantumCircuit implementing the phase polynomial.
         """
-        cnot_sequence = []
+        n = P.shape[0]
+        circ = QuantumCircuit(n)
+
+        P = P.copy()
+        angles = list(angles)
+
         while P.shape[1] > 0:
+            # Step 1: choose a parity y with minimal Hamming weight
             col_idx, y = self._choose_parity(P)
-            P = np.delete(P, col_idx, axis=1)
+            angle = angles.pop(col_idx)
+            P = np.delete(P, col_idx, axis=1)   # remove column
+
+            # Step 2: build parity graph and find minimum arborescence
             G = self._build_parity_graph(y, P)
             arborescence = self._find_min_weight_arborescence(G)
 
-            # Perform depth-first postorder traversal
-            for i in nx.dfs_postorder_nodes(arborescence, source=next(iter(arborescence.nodes))):
-                predecessors = list(arborescence.predecessors(i))
-                if predecessors:
-                    j = predecessors[0]
-                    cnot_sequence.append((j, i))
-                    # Update the parity table
-                    P[i] ^= P[j]
+            # Find the root (node with indegree 0)
+            roots = [n for n in arborescence.nodes if arborescence.in_degree(n) == 0]
+            if not roots:
+                # fallback to first node, although should not happen
+                print("No roots found")
+                root = next(iter(arborescence.nodes))
+            else:
+                root = roots[0]
+            for node in arborescence.nodes:
+                if len(list(arborescence.predecessors(node))) == 0:
+                    root = node
+                    break
 
-        return P, cnot_sequence
+            # Process the arborescence in a successors‑first (postorder) traversal
+            for i in nx.dfs_postorder_nodes(arborescence, source=root):
+                if i == root:
+                    continue
+                # Get the unique predecessor
+                pred = next(iter(arborescence.predecessors(i)))
+                circ.cx(pred, i)          # control = pred, target = i
+                # Update the parity table rows
+                P[i, :] ^= P[pred, :]
 
-    def optimize_block(self, block, connectivity="all-to-all"):
+            # After the arborescence, the parity y is stored on the root qubit.
+            # Apply the corresponding Rz gate.
+            circ.rz(angle, root)
+
+        return circ
+
+
+    def optimize_block(self, block: QuantumCircuit) -> QuantumCircuit:
         """
-        Optimizes a phase polynomial block using the specified algorithm.
-        """
-        parity_table = self._extract_parity_table(block)
-        _, cnot_sequence = self._synthesize_block_all_to_all(parity_table)
-
-        # Build the optimized circuit
-        from qiskit import QuantumCircuit
-        optimized_block = QuantumCircuit(*block.qregs)
-        for control_idx, target_idx in cnot_sequence:
-            optimized_block.cx(control_idx, target_idx)
-
-        # Re-add Rz gates from the original block
-        for gate, qargs, cargs in block.data:
-            if gate.name.startswith('rz'):
-                # Use find_bit to get the index of the qubit
-                qubit = qargs[0]
-                qubit_idx = block.find_bit(qubit)[0]
-                optimized_block.rz(gate.params[0], qubit_idx)
-
-        return optimized_block
-
-    def replace_block(self, circuit: QuantumCircuit, start: int, end: int,
-                      optimized_block: QuantumCircuit ) -> QuantumCircuit:
-        """
-        Replaces a phase polynomial block in the original circuit with an optimized version.
+        Optimise a single phase‑polynomial block using the all‑to‑all synthesis algorithm.
 
         Args:
-            circuit: The original QuantumCircuit.
-            start: Start index of the block to replace.
-            end: End index of the block to replace.
-            optimized_block: The optimized QuantumCircuit to insert.
+            block: a QuantumCircuit that consists only of CNOT and Rz gates.
 
         Returns:
-            A new QuantumCircuit with the block replaced.
+            An optimised QuantumCircuit implementing the same phase polynomial.
         """
-        new_circuit = circuit.copy()
-        new_circuit.data = (
-            circuit.data[:start] +
-            optimized_block.data +
-            circuit.data[end + 1:]
-        )
+        P, angles = self._extract_parity_table(block)
+        opt_circ = self.synthesize_all_to_all(P, angles)
+        return opt_circ
+
+    def replace_blocks(self, blocks: List[Tuple[int, int, List[int], List]]) -> QuantumCircuit:
+        # Build a dictionary from start index to (end index, optimized circuit)
+        block_map = {}
+        for start, end, _, _ in blocks:
+            block_circ = self.extract_block(start, end)
+            opt_circ = self.optimize_block(block_circ)
+            block_map[start] = (end, opt_circ)
+
+        # Create a new circuit with the same registers as the original
+        new_circuit = self.circuit.copy_empty_like()
+
+        i = 0
+        while i < len(self.circuit.data):
+            if i in block_map:
+                end, opt_circ = block_map[i]
+                # Append all instructions from the optimized circuit
+                for instr, qargs, cargs in opt_circ.data:
+                    new_circuit.append(instr, qargs, cargs)
+                i = end + 1  # jump past the original block
+            else:
+                instr, qargs, cargs = self.circuit.data[i]
+                new_circuit.append(instr, qargs, cargs)
+                i += 1
+
         return new_circuit
+
+
+    def optimize(self) -> QuantumCircuit:
+        """Find and replace all phase‑polynomial blocks, returning the optimized circuit."""
+        blocks = self.find_blocks()
+        if not blocks:
+            print("No blocks to optimize!")
+            return self.circuit.copy()  # nothing to optimize
+        optimized_circuit = self.replace_blocks(blocks)
+        return optimized_circuit
