@@ -74,20 +74,19 @@ class PhasePolyOptimizer:
             subcircuit.append(self.circuit.data[i][0], self.circuit.data[i][1])
         return subcircuit
 
-    def _extract_parity_table(self, block: QuantumCircuit) -> Tuple[np.ndarray, List[float]]:
+    def _extract_parity_table(self, block: QuantumCircuit) -> Tuple[np.ndarray, List[Union[float, ParameterExpression]]]:
         """
         Extract the parity table and the corresponding angles from a block
         that consists only of CNOT and Rz gates.
 
         Returns:
             P: binary matrix of shape (n, m) where each column is a parity
-            angles: list of floats, same length as number of columns
+            angles: list of angles (float or ParameterExpression) of length m
         """
         n = block.num_qubits
-        # M: current linear mapping, initially identity
-        M = np.eye(n, dtype=int)
-        # Store parities as tuples and accumulated angles
-        parity_dict = {}
+        M = np.eye(n, dtype=int)  # current linear mapping
+        parity_dict = {}   # parity -> total angle
+
         for gate, qargs, _ in block.data:
             if gate.name == 'cx':
                 control = block.find_bit(qargs[0])[0]
@@ -95,23 +94,24 @@ class PhasePolyOptimizer:
                 M[target] = (M[target] ^ M[control]) % 2
             elif gate.name == 'rz':
                 qubit = block.find_bit(qargs[0])[0]
-                # Get the parity vector for this qubit
-                parity = tuple(M[qubit])  # convert to tuple for hashing
-                angle = gate.params[0]  # keep symbolic if present
+                parity = tuple(M[qubit]) # tuple of ints (0/1)
+                angle = gate.params[0] # could be float or ParameterExpression
                 if parity in parity_dict:
+                    # Add angle works for both floats and ParameterExpressions
                     parity_dict[parity] += angle
                 else:
                     parity_dict[parity] = angle
             else:
                 raise ValueError(f"Unexpected gate {gate.name} in phase polynomial block")
-        # Build parity table as a matrix (n x m)
+        # Build parity table and angle list
         parities = list(parity_dict.keys())
         m = len(parities)
         P = np.zeros((n, m), dtype=int)
-        angles = np.zeros(m, dtype=float)
+        angles = [0.0] * m   # placeholder, will fill with actual angles
         for j, parity in enumerate(parities):
             P[:, j] = list(parity)
             angles[j] = parity_dict[parity]
+
         return P, angles
 
     def _choose_parity(self, P: np.ndarray) -> Tuple[int, np.ndarray]:
@@ -152,7 +152,7 @@ class PhasePolyOptimizer:
         # For a complete directed graph it will be a single arborescence.
         return nx.algorithms.tree.branchings.minimum_spanning_arborescence(G)
 
-    def synthesize_all_to_all(self, P: np.ndarray, angles: List[float]) -> QuantumCircuit:
+    def synthesize_all_to_all(self, P: np.ndarray, angles: List[Union[float, ParameterExpression]]) -> QuantumCircuit:
         """
         Synthesise a phase polynomial using the all‑to‑all algorithm (Algorithm 1 of the paper).
 
@@ -167,7 +167,7 @@ class PhasePolyOptimizer:
         circ = QuantumCircuit(n)
 
         P = P.copy()
-        angles = list(angles)
+        angles = list(angles)   # copy to avoid modifying original
 
         while P.shape[1] > 0:
             # Step 1: choose a parity y with minimal Hamming weight
@@ -182,15 +182,10 @@ class PhasePolyOptimizer:
             # Find the root (node with indegree 0)
             roots = [n for n in arborescence.nodes if arborescence.in_degree(n) == 0]
             if not roots:
-                # fallback to first node, although should not happen
-                print("No roots found")
+                # fallback: pick any node as root (should not happen for a spanning arborescence)
                 root = next(iter(arborescence.nodes))
             else:
                 root = roots[0]
-            for node in arborescence.nodes:
-                if len(list(arborescence.predecessors(node))) == 0:
-                    root = node
-                    break
 
             # Process the arborescence in a successors‑first (postorder) traversal
             for i in nx.dfs_postorder_nodes(arborescence, source=root):
@@ -198,13 +193,16 @@ class PhasePolyOptimizer:
                     continue
                 # Get the unique predecessor
                 pred = next(iter(arborescence.predecessors(i)))
-                circ.cx(pred, i)          # control = pred, target = i
-                # Update the parity table rows
+                circ.cx(pred, i)
+                # Update parity table rows: row i gets XORed with row pred
                 P[i, :] ^= P[pred, :]
 
-            # After the arborescence, the parity y is stored on the root qubit.
-            # Apply the corresponding Rz gate.
-            circ.rz(angle, root)
+            # Apply the Rz gate on the root qubit (skip if angle is zero) as
+            # Check for numeric zero; for symbolic, we cannot easily test zero, so we always add.
+            if isinstance(angle, (int, float)) and angle == 0:
+                pass
+            else:
+                circ.rz(angle, root)
 
         return circ
 
