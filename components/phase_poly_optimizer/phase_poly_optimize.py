@@ -167,13 +167,13 @@ class PhasePolyOptimizer:
         circ = QuantumCircuit(n)
 
         P = P.copy()
-        angles = list(angles)   # copy to avoid modifying original
+        angles = list(angles) # copy to avoid modifying original
 
         while P.shape[1] > 0:
             # Step 1: choose a parity y with minimal Hamming weight
             col_idx, y = self._choose_parity(P)
             angle = angles.pop(col_idx)
-            P = np.delete(P, col_idx, axis=1)   # remove column
+            P = np.delete(P, col_idx, axis=1) # remove column
 
             # Step 2: build parity graph and find minimum arborescence
             G = self._build_parity_graph(y, P)
@@ -182,23 +182,22 @@ class PhasePolyOptimizer:
             # Find the root (node with indegree 0)
             roots = [n for n in arborescence.nodes if arborescence.in_degree(n) == 0]
             if not roots:
-                # fallback: pick any node as root (should not happen for a spanning arborescence)
-                root = next(iter(arborescence.nodes))
+                root = next(iter(arborescence.nodes)) # fallback but should not happen for a spanning arborescence
             else:
                 root = roots[0]
 
             # Process the arborescence in a successors‑first (postorder) traversal
-            for i in nx.dfs_postorder_nodes(arborescence, source=root):
-                if i == root:
+            for node in nx.dfs_postorder_nodes(arborescence, source=root):
+                if node == root:
                     continue
-                # Get the unique predecessor
-                pred = next(iter(arborescence.predecessors(i)))
-                circ.cx(pred, i)
-                # Update parity table rows: row i gets XORed with row pred
-                P[i, :] ^= P[pred, :]
+                # Get the unique predecessor (parent)
+                parent = next(iter(arborescence.predecessors(node)))
+                # Apply CNOT from child (node) to parent
+                circ.cx(node, parent)
+                # Update the child's row in the parity table
+                P[node, :] ^= P[parent, :]
 
-            # Apply the Rz gate on the root qubit (skip if angle is zero) as
-            # Check for numeric zero; for symbolic, we cannot easily test zero, so we always add.
+            # Apply the Rz gate on the root qubit (skip if angle is zero)
             if isinstance(angle, (int, float)) and angle == 0:
                 pass
             else:
@@ -232,17 +231,27 @@ class PhasePolyOptimizer:
         # Create a new circuit with the same registers as the original
         new_circuit = self.circuit.copy_empty_like()
 
+        def map_qargs(source_circuit: QuantumCircuit, target_circuit: QuantumCircuit, qargs):
+            return [target_circuit.qubits[source_circuit.find_bit(q).index] for q in qargs]
+
+        def map_cargs(source_circuit: QuantumCircuit, target_circuit: QuantumCircuit, cargs):
+            return [target_circuit.clbits[source_circuit.find_bit(c).index] for c in cargs]
+
         i = 0
         while i < len(self.circuit.data):
             if i in block_map:
                 end, opt_circ = block_map[i]
-                # Append all instructions from the optimized circuit
+                # append instructions from the optimized circuit remapping bits
                 for instr, qargs, cargs in opt_circ.data:
-                    new_circuit.append(instr, qargs, cargs)
+                    mapped_qargs = map_qargs(opt_circ, new_circuit, qargs)
+                    mapped_cargs = map_cargs(opt_circ, new_circuit, cargs)
+                    new_circuit.append(instr, mapped_qargs, mapped_cargs)
                 i = end + 1  # jump past the original block
             else:
                 instr, qargs, cargs = self.circuit.data[i]
-                new_circuit.append(instr, qargs, cargs)
+                mapped_qargs = map_qargs(self.circuit, new_circuit, qargs)
+                mapped_cargs = map_cargs(self.circuit, new_circuit, cargs)
+                new_circuit.append(instr, mapped_qargs, mapped_cargs)
                 i += 1
 
         return new_circuit
