@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 from typing import List, Tuple, Dict, Optional, Union
 from qiskit import QuantumCircuit
-from qiskit.circuit import ParameterExpression
+from qiskit.circuit.library import LinearFunction
 
 class PhasePolyOptimizer:
     """
@@ -74,14 +74,10 @@ class PhasePolyOptimizer:
             subcircuit.append(self.circuit.data[i][0], self.circuit.data[i][1])
         return subcircuit
 
-    def _extract_parity_table(self, block: QuantumCircuit) -> Tuple[np.ndarray, List[Union[float, ParameterExpression]]]:
+    def _extract_parity_table(self, block: QuantumCircuit):
         """
         Extract the parity table and the corresponding angles from a block
         that consists only of CNOT and Rz gates.
-
-        Returns:
-            P: binary matrix of shape (n, m) where each column is a parity
-            angles: list of angles (float or ParameterExpression) of length m
         """
         n = block.num_qubits
         M = np.eye(n, dtype=int)  # current linear mapping
@@ -95,9 +91,8 @@ class PhasePolyOptimizer:
             elif gate.name == 'rz':
                 qubit = block.find_bit(qargs[0])[0]
                 parity = tuple(M[qubit]) # tuple of ints (0/1)
-                angle = gate.params[0] # could be float or ParameterExpression
+                angle = gate.params[0]
                 if parity in parity_dict:
-                    # Add angle works for both floats and ParameterExpressions
                     parity_dict[parity] += angle
                 else:
                     parity_dict[parity] = angle
@@ -112,7 +107,7 @@ class PhasePolyOptimizer:
             P[:, j] = list(parity)
             angles[j] = parity_dict[parity]
 
-        return P, angles
+        return P, angles, M
 
     def _choose_parity(self, P: np.ndarray) -> Tuple[int, np.ndarray]:
         """
@@ -152,56 +147,68 @@ class PhasePolyOptimizer:
         # For a complete directed graph it will be a single arborescence.
         return nx.algorithms.tree.branchings.minimum_spanning_arborescence(G)
 
-    def synthesize_all_to_all(self, P: np.ndarray, angles: List[Union[float, ParameterExpression]]) -> QuantumCircuit:
-        """
-        Synthesise a phase polynomial using the all‑to‑all algorithm (Algorithm 1 of the paper).
+    def _gf2_invert(self, M: np.ndarray) -> np.ndarray:
+        n = len(M)
+        A = np.hstack((M.copy(), np.eye(n, dtype=int)))
+        for i in range(n):
+            if A[i, i] == 0:
+                for j in range(i + 1, n):
+                    if A[j, i] == 1:
+                        A[[i, j]] = A[[j, i]]
+                        break
+            for j in range(n):
+                if i != j and A[j, i] == 1:
+                    A[j] ^= A[i]
+        return A[:, n:] % 2
 
-        Args:
-            P: parity table (n x m)
-            angles: list of angles, same length as columns of P
-
-        Returns:
-            A QuantumCircuit implementing the phase polynomial.
-        """
+    def synthesize_all_to_all(self, P: np.ndarray, angles: List[float], M_target: np.ndarray) -> QuantumCircuit:
         n = P.shape[0]
         circ = QuantumCircuit(n)
 
+        # Track the linear transformation of the new optimized circuit
+        M_opt = np.eye(n, dtype=int)
+
         P = P.copy()
-        angles = list(angles) # copy to avoid modifying original
+        angles = list(angles)
 
         while P.shape[1] > 0:
-            # Step 1: choose a parity y with minimal Hamming weight
             col_idx, y = self._choose_parity(P)
             angle = angles.pop(col_idx)
-            P = np.delete(P, col_idx, axis=1) # remove column
+            P = np.delete(P, col_idx, axis=1)
 
-            # Step 2: build parity graph and find minimum arborescence
+            # Skip synthesis if parity is all zeros (can happen if angles map to parity 0)
+            if np.sum(y) == 0:
+                continue
+
             G = self._build_parity_graph(y, P)
             arborescence = self._find_min_weight_arborescence(G)
 
-            # Find the root (node with indegree 0)
-            roots = [n for n in arborescence.nodes if arborescence.in_degree(n) == 0]
-            if not roots:
-                root = next(iter(arborescence.nodes)) # fallback but should not happen for a spanning arborescence
-            else:
-                root = roots[0]
+            roots = [node for node in arborescence.nodes if arborescence.in_degree(node) == 0]
+            root = roots[0] if roots else next(iter(arborescence.nodes))
 
-            # Process the arborescence in a successors‑first (postorder) traversal
             for node in nx.dfs_postorder_nodes(arborescence, source=root):
                 if node == root:
                     continue
-                # Get the unique predecessor (parent)
                 parent = next(iter(arborescence.predecessors(node)))
-                # Apply CNOT from child (node) to parent
-                circ.cx(node, parent)
-                # Update the child's row in the parity table
-                P[node, :] ^= P[parent, :]
 
-            # Apply the Rz gate on the root qubit (skip if angle is zero)
-            if isinstance(angle, (int, float)) and angle == 0:
-                pass
-            else:
+                circ.cx(parent, node)
+                P[node, :] ^= P[parent, :]
+                # Track the basis change exactly as the parity table
+                M_opt[node, :] ^= M_opt[parent, :]
+
+            if angle != 0.0:
                 circ.rz(angle, root)
+
+        # --- BASIS CORRECTION STEP ---
+        # need a transformation T such that T @ M_opt = M_target (modulo 2).
+        # so T = M_target @ inv(M_opt) (modulo 2).
+        M_opt_inv = self._gf2_invert(M_opt)
+        T = (M_target @ M_opt_inv) % 2
+
+        # Qiskit's LinearFunction automatically synthesizes a CNOT network for this matrix
+        correction_circ = LinearFunction(T).definition
+        if correction_circ and len(correction_circ.data) > 0:
+            circ = circ.compose(correction_circ)
 
         return circ
 
@@ -216,8 +223,8 @@ class PhasePolyOptimizer:
         Returns:
             An optimised QuantumCircuit implementing the same phase polynomial.
         """
-        P, angles = self._extract_parity_table(block)
-        opt_circ = self.synthesize_all_to_all(P, angles)
+        P, angles, M_target = self._extract_parity_table(block)
+        opt_circ = self.synthesize_all_to_all(P, angles, M_target)
         return opt_circ
 
     def replace_blocks(self, blocks: List[Tuple[int, int, List[int], List]]) -> QuantumCircuit:
