@@ -7,7 +7,7 @@ from qiskit.transpiler import CouplingMap
 from components.phase_poly_optimizer.topology_aware_phase_poly import TopologyAwareBackend
 
 
-class PhasePolyOptimizer:
+class PhasePolyA2A:
     """
     Find and optimize maximal non-overlapping {cx, rz} blocks in a Qiskit circuit.
 
