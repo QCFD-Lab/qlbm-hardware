@@ -2,39 +2,6 @@ from architecture_aware_phasepoly_optimizer import *
 from components.phase_poly_optimizer.architecture_aware_phasepoly_optimizer import _qubit_index_map
 
 
-def unitary_equiv_up_to_global_phase(
-    circuit_a: QuantumCircuit,
-    circuit_b: QuantumCircuit,
-    *,
-    atol: float = 1e-9,
-) -> bool:
-    """
-    Compare two small circuits by converting them to dense unitaries and checking
-    equality up to global phase.
-
-    This is intended for toy tests only. It uses qiskit's `Operator` class to obtain
-    the dense matrix representation, so it should only be used on small circuits.
-    """
-    u_a = Operator(circuit_a).data
-    u_b = Operator(circuit_b).data
-
-    if u_a.shape != u_b.shape:
-        return False
-
-    # Choose a stable pivot on the largest-magnitude entry.
-    idx = np.unravel_index(np.argmax(np.abs(u_b)), u_b.shape)
-    denom = u_b[idx]
-    if abs(denom) < atol:
-        return np.allclose(u_a, u_b, atol=atol, rtol=0.0)
-
-    phase = u_a[idx] / denom
-    if abs(phase) < atol:
-        return False
-    phase /= abs(phase)
-    return np.allclose(u_a, phase * u_b, atol=atol, rtol=0.0)
-
-
-
 def _toy_block_two_qubits() -> Tuple[QuantumCircuit, CouplingMap]:
     qc = QuantumCircuit(2)
     qc.cx(0, 1)

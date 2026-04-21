@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from collections import OrderedDict
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import networkx as nx
 import numpy as np
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit
 from qiskit.circuit import Qubit
 from qiskit.transpiler import CouplingMap
 from qiskit.quantum_info import Operator
@@ -654,6 +654,35 @@ def residual_linear_transform(
     return gf2_matrix_to_rows(residual)
 
 
+def _phasepoly_cost_tuple(circuit: QuantumCircuit) -> Tuple[int, int, int]:
+    """
+    Cost tuple used to compare two phase-polynomial block implementations.
+
+    Priority:
+    1. fewer CX gates
+    2. lower depth
+    3. fewer total operations
+    """
+    ops = circuit.count_ops()
+    cx = int(ops.get("cx", 0))
+    depth = int(circuit.depth() or 0)
+    size = int(sum(int(v) for v in ops.values()))
+    return (cx, depth, size)
+
+
+def _choose_better_phasepoly_block(
+    original: QuantumCircuit,
+    candidate: QuantumCircuit,
+) -> QuantumCircuit:
+    """
+    Keep the candidate only if it is strictly better than the original under the
+    phase-polynomial block cost metric.
+    """
+    if _phasepoly_cost_tuple(candidate) < _phasepoly_cost_tuple(original):
+        return candidate
+    return original
+
+
 # =========================
 # Emission helpers
 # =========================
@@ -701,20 +730,18 @@ class ArchitectureAwarePhasePolyOptimizer:
     - extracts a faithful internal representation
     - synthesizes the phase-support part using the paper's recursion
     - computes the final residual linear transform A * P'^-1
-    - temporarily realizes that final residual with an all-to-all CNOT synthesizer and
-      routes it with Qiskit as a fallback until Steiner-Gauss is ported.
+    - synthesizes that residual natively with a Steiner-Gauss-style architecture-aware routine
+    - optionally keeps the original block if the synthesized result is worse by cost
 
     Remaining work:
     - maximal block extraction from mixed circuits
-    - a faithful architecture-aware port of Steiner-Gauss for the final linear transform
+    - making the Steiner-Gauss port closer to the reference implementation for better CX counts
     - optional placement when coupling_map has more qubits than the circuit
     """
 
     allow_barriers: bool = True
     debug: bool = False
-    route_residual_with_qiskit: bool = True
-    routing_method: str = "basic"
-    optimization_level: int = 0
+    keep_original_if_worse: bool = True
 
     def optimize(self, circuit: QuantumCircuit, coupling_map: CouplingMap) -> QuantumCircuit:
         if not isinstance(coupling_map, CouplingMap):
@@ -736,7 +763,48 @@ class ArchitectureAwarePhasePolyOptimizer:
         residual_rows = residual_linear_transform(phase_poly.out_parities, emitted_out_parities)
         residual_circuit = synthesize_linear_transform_steiner_gauss(residual_rows, coupling_map)
 
-        out = QuantumCircuit(circuit.num_qubits)
-        out.compose(phase_circuit, inplace=True)
-        out.compose(residual_circuit, inplace=True)
-        return out
+        candidate = QuantumCircuit(circuit.num_qubits)
+        candidate.compose(phase_circuit, inplace=True)
+        candidate.compose(residual_circuit, inplace=True)
+
+        if self.debug:
+            equivalent = unitary_equiv_up_to_global_phase(circuit, candidate)
+            if not equivalent:
+                raise ValueError("Synthesized circuit is not equivalent to the input block.")
+
+        if self.keep_original_if_worse:
+            return _choose_better_phasepoly_block(circuit, candidate)
+
+        return candidate
+
+
+def unitary_equiv_up_to_global_phase(
+    circuit_a: QuantumCircuit,
+    circuit_b: QuantumCircuit,
+    *,
+    atol: float = 1e-9,
+) -> bool:
+    """
+    Compare two small circuits by converting them to dense unitaries and checking
+    equality up to global phase.
+
+    This is intended for toy tests only. It uses qiskit's `Operator` class to obtain
+    the dense matrix representation, so it should only be used on small circuits.
+    """
+    u_a = Operator(circuit_a).data
+    u_b = Operator(circuit_b).data
+
+    if u_a.shape != u_b.shape:
+        return False
+
+    # Choose a stable pivot on the largest-magnitude entry.
+    idx = np.unravel_index(np.argmax(np.abs(u_b)), u_b.shape)
+    denom = u_b[idx]
+    if abs(denom) < atol:
+        return np.allclose(u_a, u_b, atol=atol, rtol=0.0)
+
+    phase = u_a[idx] / denom
+    if abs(phase) < atol:
+        return False
+    phase /= abs(phase)
+    return np.allclose(u_a, phase * u_b, atol=atol, rtol=0.0)
