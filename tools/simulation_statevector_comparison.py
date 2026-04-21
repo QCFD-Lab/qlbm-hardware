@@ -87,3 +87,43 @@ def compare_statevectors(dir_unoptimized: str, dir_optimized: str, tolerance: fl
             all_match = False
 
     return all_match, differences
+
+
+def compare_statevectors_ignoring_global_phase(file1_path, file2_path, tolerance=1e-10):
+    state1 = np.load(file1_path)
+    state2 = np.load(file2_path)
+
+    norm1 = np.sum(np.abs(state1) ** 2)
+    norm2 = np.sum(np.abs(state2) ** 2)
+
+    overlap = np.vdot(state1, state2)  # <state1|state2>
+    overlap_abs = np.abs(overlap)
+
+    if overlap_abs < tolerance:
+        # If overlap is ~0, a global phase alignment is not meaningful.
+        state2_phase_removed = state2.copy()
+        global_phase = None
+        is_equal = False
+    else:
+        phase = overlap / overlap_abs
+        state2_phase_removed = state2 / phase
+        global_phase = np.angle(phase)
+        is_equal = np.allclose(state1, state2_phase_removed, atol=tolerance)
+
+    absolute_diff = np.abs(state1 - state2_phase_removed)
+    relative_diff = absolute_diff / (np.abs(state1) + 1e-12)
+    diff_indices = np.where(absolute_diff > tolerance)[0]
+
+    return {
+        "state1_length": len(state1),
+        "state2_length": len(state2),
+        "state1_norm": norm1,
+        "state2_norm": norm2,
+        "overlap_abs": overlap_abs,
+        "global_phase_diff": global_phase,
+        "statevectors_equal_ignoring_phase": is_equal,
+        "absolute_differences": absolute_diff,
+        "relative_differences": relative_diff,
+        "indices_with_large_differences": diff_indices,
+        "max_absolute_difference": np.max(absolute_diff),
+    }

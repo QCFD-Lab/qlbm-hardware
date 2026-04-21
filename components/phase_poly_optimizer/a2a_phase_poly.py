@@ -2,12 +2,8 @@ import numpy as np
 import networkx as nx
 from typing import List, Tuple, Any, Optional
 from qiskit import QuantumCircuit
-from qiskit.transpiler import CouplingMap
 
-from components.phase_poly_optimizer.topology_aware_phase_poly import TopologyAwareBackend
-
-
-class PhasePolyA2A:
+class A2APhasePoly:
     """
     Find and optimize maximal non-overlapping {cx, rz} blocks in a Qiskit circuit.
 
@@ -21,11 +17,9 @@ class PhasePolyA2A:
            the original unitary exactly (up to global phase).
     """
 
-    def __init__(self, circuit: QuantumCircuit, coupling_map: Optional[CouplingMap] = None):
+    def __init__(self, circuit: QuantumCircuit):
         self.circuit = circuit
         self.blocks = []
-        self.coupling_map = coupling_map
-
 
     @staticmethod
     def _inst_fields(inst: Any):
@@ -487,16 +481,10 @@ class PhasePolyA2A:
             f"{stats['decision']}"
         )
 
-    def optimize_block(self, block: QuantumCircuit, active_qubits: Optional[List[int]] = None) -> QuantumCircuit:
+    def optimize_block(self, block: QuantumCircuit) -> QuantumCircuit:
         """
         Optimize a single compact {cx, rz} block while preserving block equivalence.
         """
-        if self.coupling_map is not None:
-            if active_qubits is None:
-                raise ValueError("Topology-aware optimization requires compact active_qubits.")
-            backend = TopologyAwareBackend(self, self.coupling_map)
-            return backend.optimize_block(block, active_qubits)
-
         P_abs, angles, A_orig = self._extract_phase_polynomial_and_linear_map(block)
 
         phase_circ, A_phase = self._synthesize_phase_polynomial_all_to_all(
@@ -521,7 +509,7 @@ class PhasePolyA2A:
 
         for block_id, (start, end, qubits, _) in enumerate(blocks, start=1):
             orig_block, active_qubits = self.extract_block_compact(start, end)
-            cand_block = self.optimize_block(orig_block, active_qubits=active_qubits)
+            cand_block = self.optimize_block(orig_block)
 
             use_candidate, stats = self._is_better_block(orig_block, cand_block)
             self._log_block_decision(

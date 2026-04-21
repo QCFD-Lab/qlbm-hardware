@@ -1,9 +1,8 @@
 from qiskit import QuantumCircuit, transpile
+from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.transpiler import CouplingMap
 from collections import Counter
 from typing import Dict, Any, Optional, List
-import warnings
-
 
 class ResourceEstimator:
     """
@@ -13,7 +12,7 @@ class ResourceEstimator:
     and returns an object with various metrics.
     """
     
-    def __init__(self, hardware_config: Dict[str, Any]):
+    def __init__(self, hardware_config: Dict[str, Any], force_no_coupling: bool = False, remove_idle_qubits: bool = False):
         """
         Initialize the resource estimator with a hardware config.
         
@@ -32,12 +31,17 @@ class ResourceEstimator:
         self.coupling_type = hardware_config.get("coupling_type", None)
         self.coupling_params = hardware_config.get("coupling_params", {})
         self.gate_times = hardware_config.get("gate_times", None)
-        
-        # Generate coupling map if coupling_type is provided
-        if self.coupling_type is not None:
-            self.coupling_map = self._generate_coupling_map()
+        self.remove_idle_qubits = remove_idle_qubits
+
+        if force_no_coupling:
+            self.coupling_map = None
+            self.coupling_type = None
+        else:
+            # Generate coupling map if coupling_type is provided
+            if self.coupling_type is not None:
+                self.coupling_map = self._generate_coupling_map()
     
-    def transpile_for_platform(self, circuit: QuantumCircuit, optimization_level: int = 2,
+    def transpile_for_platform(self, circuit: QuantumCircuit, optimization_level: int = 0,
         seed_transpiler: Optional[int] = None) -> QuantumCircuit:
         """
         Transpile the circuit for the given hardware platform.
@@ -75,6 +79,7 @@ class ResourceEstimator:
         depth = circuit.depth()
         size = circuit.size()
         num_qubits = circuit.num_qubits
+        active_qubits = self._count_active_qubits(circuit)
         
         by_arity = self._count_gates_by_arity(ops)
         
@@ -82,6 +87,7 @@ class ResourceEstimator:
         
         metrics = {
             "num_qubits": num_qubits,
+            "active_qubits": active_qubits,
             "depth": depth,
             "size": size,
             "ops_per_gate": dict(ops),
@@ -205,6 +211,19 @@ class ResourceEstimator:
                 total_time += count * self.gate_times[name]
         
         return total_time
+
+    @staticmethod
+    def _count_active_qubits(circuit: QuantumCircuit) -> int:
+        dag = circuit_to_dag(circuit)
+        return circuit.num_qubits - len(list(dag.idle_wires()))
+
+    @staticmethod
+    def _remove_idle_qubits(qc: QuantumCircuit) -> QuantumCircuit:
+        dag = circuit_to_dag(qc)
+        idle_qubits = list(dag.idle_wires())
+        if idle_qubits:
+            dag.remove_qubits(*idle_qubits)
+        return dag_to_circuit(dag)
     
     def estimate(self, circuit: QuantumCircuit, optimization_level: int = 3,  seed_transpiler: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -221,11 +240,19 @@ class ResourceEstimator:
         """
         platform_num_qubits = self.hardware_config.get("num_qubits", float("inf"))
 
-        transpiled_circuit = self.transpile_for_platform(
+        transpiled_circuit_raw = self.transpile_for_platform(
             circuit,
             optimization_level=optimization_level,
             seed_transpiler=seed_transpiler,
         )
+
+        if self.remove_idle_qubits:
+            transpiled_circuit_without_idle = self._remove_idle_qubits(transpiled_circuit_raw)
+            metrics = self.extract_metrics(transpiled_circuit_without_idle)
+            transpiled_circuit = transpiled_circuit_without_idle
+        else:
+            metrics = self.extract_metrics(transpiled_circuit_raw)
+            transpiled_circuit = transpiled_circuit_raw
 
         if transpiled_circuit.num_qubits > platform_num_qubits:
            print(f"WARNING: Circuit requires {transpiled_circuit.num_qubits} qubits, but the platform only supports "
@@ -233,7 +260,7 @@ class ResourceEstimator:
             )
 
         result = {
-            "metrics": self.extract_metrics(transpiled_circuit),
+            "metrics": metrics,
             "transpiled_circuit": transpiled_circuit,
         }
 

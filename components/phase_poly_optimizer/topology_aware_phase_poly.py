@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import networkx as nx
 import numpy as np
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit
 from qiskit.transpiler import CouplingMap
 
 
@@ -14,7 +14,7 @@ class TopologyAwarePhasePolyOptimizer:
     routed CNOT-only correction circuit so the optimized block is exactly
     equivalent to the original block.
 
-    Public workflow:
+    Pipeline:
         optimizer = TopologyAwarePhasePolyOptimizer(circuit, coupling_map)
         optimized_circuit = optimizer.optimize()
 
@@ -28,17 +28,13 @@ class TopologyAwarePhasePolyOptimizer:
       kept unchanged.
     """
 
-    def __init__(
-        self,
-        circuit: QuantumCircuit,
-        coupling_map: Union[CouplingMap, Sequence[Tuple[int, int]]],
-        routing_method: str = "basic",
-        optimization_level: int = 0,
-    ) -> None:
+    def __init__(self, circuit: QuantumCircuit, coupling_map: Union[CouplingMap, Sequence[Tuple[int, int]]],
+                 routing_method: str = "basic", optimization_level: int = 0) -> None:
         self.circuit = circuit
         self.blocks: List[Tuple[int, int, List[int], List[Any]]] = []
         self.routing_method = routing_method
         self.optimization_level = optimization_level
+        self.first_accepted_block_debug = None
 
         if isinstance(coupling_map, CouplingMap):
             edges = list(coupling_map.get_edges())
@@ -57,8 +53,8 @@ class TopologyAwarePhasePolyOptimizer:
         """
         Find maximal contiguous blocks containing only CX and RZ gates.
         """
-        blocks: List[Tuple[int, int, List[int], List[Any]]] = []
-        current_block: Optional[dict] = None
+        blocks = []
+        current_block = None
 
         for i, inst in enumerate(self.circuit.data):
             gate, qargs, _ = self._inst_fields(inst)
@@ -79,25 +75,21 @@ class TopologyAwarePhasePolyOptimizer:
                     current_block["gates"].append((gate, qargs))
             else:
                 if current_block is not None:
-                    blocks.append(
-                        (
-                            current_block["start"],
-                            current_block["end"],
-                            list(current_block["qubits"]),
-                            current_block["gates"],
-                        )
-                    )
+                    blocks.append((
+                        current_block["start"],
+                        current_block["end"],
+                        list(current_block["qubits"]),
+                        current_block["gates"],
+                    ))
                     current_block = None
 
         if current_block is not None:
-            blocks.append(
-                (
-                    current_block["start"],
-                    current_block["end"],
-                    list(current_block["qubits"]),
-                    current_block["gates"],
-                )
-            )
+            blocks.append((
+                current_block["start"],
+                current_block["end"],
+                list(current_block["qubits"]),
+                current_block["gates"],
+            ))
 
         self.blocks = blocks
         return blocks
@@ -220,17 +212,134 @@ class TopologyAwarePhasePolyOptimizer:
         return P_abs, angles, A.copy()
 
     def _make_local_graph(self, active_global_qubits: List[int]) -> nx.Graph:
+        """
+        Build the induced local architecture graph on the active qubits.
+
+        Important:
+        - Include *all* active qubits as nodes, even if they are isolated in the
+          induced subgraph.
+        - Relabel global qubit ids to local [0, n-1] indices.
+        """
         active = list(active_global_qubits)
         active_set = set(active)
         relabel = {gq: i for i, gq in enumerate(active)}
 
         g = nx.Graph()
         g.add_nodes_from(active)
+
         for u, v in self.global_graph.edges():
             if u in active_set and v in active_set:
                 g.add_edge(u, v)
 
         return nx.relabel_nodes(g, relabel, copy=True)
+
+    @staticmethod
+    def _is_numeric_angle(angle: Any) -> bool:
+        try:
+            float(angle)
+            return True
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _normalize_angle_mod_2pi(angle: Any, atol: float = 1e-9) -> Any:
+        """
+        Normalize a numeric angle modulo 2π.
+        This makes equivalence checking robust up to global phase.
+        Non-numeric symbolic angles are returned unchanged.
+        """
+        if not TopologyAwarePhasePolyOptimizer._is_numeric_angle(angle):
+            return angle
+
+        x = float(angle)
+        x = (x + np.pi) % (2 * np.pi) - np.pi
+
+        if np.isclose(x, 0.0, atol=atol):
+            return 0.0
+        return x
+
+    def _phase_dict_from_support(
+            self,
+            P_abs: np.ndarray,
+            angles: List[Any],
+            atol: float = 1e-9,
+    ) -> Dict[Tuple[bool, ...], Any]:
+        """
+        Convert support+angles into a parity->angle dictionary, combining
+        repeated parities and normalizing numeric angles modulo 2π.
+        """
+        out: Dict[Tuple[bool, ...], Any] = {}
+
+        for j in range(P_abs.shape[1]):
+            parity = tuple(bool(v) for v in P_abs[:, j])
+            angle = angles[j]
+
+            if parity in out:
+                angle = out[parity] + angle
+
+            angle = self._normalize_angle_mod_2pi(angle, atol=atol)
+
+            if self._is_numeric_angle(angle):
+                if np.isclose(float(angle), 0.0, atol=atol):
+                    out.pop(parity, None)
+                else:
+                    out[parity] = float(angle)
+            else:
+                # Keep symbolic angles unless they are exactly zero.
+                if angle == 0:
+                    out.pop(parity, None)
+                else:
+                    out[parity] = angle
+
+        return out
+
+    def _angles_equivalent(self, a: Any, b: Any, atol: float = 1e-9) -> bool:
+        """
+        Compare angles modulo 2π when numeric, otherwise require symbolic equality.
+        """
+        if self._is_numeric_angle(a) and self._is_numeric_angle(b):
+            diff = self._normalize_angle_mod_2pi(float(a) - float(b), atol=atol)
+            return np.isclose(float(diff), 0.0, atol=atol)
+
+        try:
+            return bool((a - b) == 0)
+        except Exception:
+            return a == b
+
+    def _blocks_equivalent(
+            self,
+            original: QuantumCircuit,
+            candidate: QuantumCircuit,
+            atol: float = 1e-9,
+    ) -> bool:
+        """
+        Validate full block equivalence in the phase-polynomial representation:
+        same linear map and same parity->angle map (up to 2π for numeric angles).
+        """
+        if original.num_qubits != candidate.num_qubits:
+            return False
+
+        try:
+            P_orig, angles_orig, A_orig = self._extract_phase_polynomial_and_linear_map(original)
+            P_cand, angles_cand, A_cand = self._extract_phase_polynomial_and_linear_map(candidate)
+        except Exception:
+            return False
+
+        if not np.array_equal(A_orig, A_cand):
+            return False
+
+        phase_orig = self._phase_dict_from_support(P_orig, angles_orig, atol=atol)
+        phase_cand = self._phase_dict_from_support(P_cand, angles_cand, atol=atol)
+
+        if set(phase_orig.keys()) != set(phase_cand.keys()):
+            return False
+
+        for parity in phase_orig:
+            if not self._angles_equivalent(phase_orig[parity], phase_cand[parity], atol=atol):
+                return False
+
+        return True
+
 
     @staticmethod
     def _non_cutting_vertices(graph: nx.Graph, subset: List[int]) -> List[int]:
@@ -304,6 +413,110 @@ class TopologyAwarePhasePolyOptimizer:
         circ.cx(control, target)
         P[control, :] ^= P[target, :]
         A_phase[target, :] ^= A_phase[control, :]
+
+    def _append_swap(self, circ: QuantumCircuit, q0: int, q1: int) -> None:
+        circ.cx(q0, q1)
+        circ.cx(q1, q0)
+        circ.cx(q0, q1)
+
+    def _append_remote_cnot_via_swaps(
+            self,
+            circ: QuantumCircuit,
+            control: int,
+            target: int,
+            graph: nx.Graph,
+    ) -> None:
+        """
+        Exact routed implementation of logical CX(control, target) on a connected graph,
+        using SWAPs to move the control next to the target and then restoring placement.
+        """
+        if control == target:
+            return
+
+        path = nx.shortest_path(graph, source=control, target=target)
+
+        # Adjacent already
+        if len(path) == 2:
+            circ.cx(control, target)
+            return
+
+        # Move control state along the path until it sits on path[-2]
+        for i in range(len(path) - 2):
+            self._append_swap(circ, path[i], path[i + 1])
+
+        # Now logical control is on path[-2], target is still on path[-1]
+        circ.cx(path[-2], path[-1])
+
+        # Restore original placement
+        for i in range(len(path) - 3, -1, -1):
+            self._append_swap(circ, path[i], path[i + 1])
+
+    def _synthesize_linear_map_graph_exact(
+            self,
+            block: QuantumCircuit,
+            A_target: np.ndarray,
+            graph: nx.Graph,
+    ) -> QuantumCircuit:
+        """
+        Correctness-first graph-constrained synthesis of a linear map.
+        This is an exact fallback replacing the currently broken Steiner-Gauss path.
+        """
+        ops = self._synthesize_linear_map_dense_ops(A_target)
+
+        circ = QuantumCircuit(block.num_qubits, name=f"{block.name}_graph_exact_fix")
+        for control, target in ops:
+            self._append_remote_cnot_via_swaps(circ, control, target, graph)
+
+        return circ
+
+
+    def _synthesize_linear_map_dense_ops(
+            self,
+            A_target: np.ndarray,
+    ) -> List[Tuple[int, int]]:
+        """
+        Return a logical CNOT sequence whose action is A_target.
+        This is the old all-to-all Gaussian-elimination synthesis, but returning
+        the logical row-add operations instead of a circuit.
+        """
+        n = A_target.shape[0]
+        B = np.array(A_target, dtype=bool, copy=True)
+        ops: List[Tuple[int, int]] = []
+
+        for col in range(n):
+            if not B[col, col]:
+                pivot = None
+                for row in range(col + 1, n):
+                    if B[row, col]:
+                        pivot = row
+                        break
+                if pivot is None:
+                    raise ValueError("A_target is not invertible over GF(2).")
+
+                # Swap rows col <-> pivot via 3 row-adds
+                B[col] ^= B[pivot]
+                ops.append((pivot, col))
+                B[pivot] ^= B[col]
+                ops.append((col, pivot))
+                B[col] ^= B[pivot]
+                ops.append((pivot, col))
+
+            for row in range(col + 1, n):
+                if B[row, col]:
+                    B[row] ^= B[col]
+                    ops.append((col, row))
+
+        for col in range(n - 1, -1, -1):
+            for row in range(col):
+                if B[row, col]:
+                    B[row] ^= B[col]
+                    ops.append((col, row))
+
+        if not np.array_equal(B, self._gf2_eye(n)):
+            raise RuntimeError("Dense linear-map synthesis failed to reduce A_target to identity.")
+
+        # Reversed sequence implements A_target.
+        return list(reversed(ops))
 
     def _synthesize_phase_polynomial_topology_aware(
         self,
@@ -388,26 +601,6 @@ class TopologyAwarePhasePolyOptimizer:
         base_recurse(active_cols, list(range(n)))
         return circ, A_phase
 
-    def _route_cnot_only_circuit(self, circuit: QuantumCircuit, local_graph: nx.Graph) -> QuantumCircuit:
-        if circuit.num_qubits <= 1 or len(circuit.data) == 0:
-            return circuit.copy()
-
-        bidir_edges = []
-        for u, v in local_graph.edges():
-            bidir_edges.append((u, v))
-            bidir_edges.append((v, u))
-
-        routed = transpile(
-            circuit,
-            basis_gates=["cx"],
-            coupling_map=CouplingMap(bidir_edges),
-            initial_layout=list(range(circuit.num_qubits)),
-            layout_method="trivial",
-            routing_method=self.routing_method,
-            optimization_level=self.optimization_level,
-        )
-        routed.global_phase = 0
-        return routed
 
     @staticmethod
     def _record_row_add(
@@ -556,95 +749,59 @@ class TopologyAwarePhasePolyOptimizer:
             circ.cx(control, target)
         return circ
 
-    def _synthesize_linear_map_all_to_all(
-        self,
-        block: QuantumCircuit,
-        A_target: np.ndarray,
-    ) -> QuantumCircuit:
-        """
-        All-to-all fallback for the correction circuit before final routing.
-        """
-        n = A_target.shape[0]
-        B = np.array(A_target, dtype=bool, copy=True)
-        ops: List[Tuple[int, int]] = []
-
-        for col in range(n):
-            if not B[col, col]:
-                pivot = None
-                for row in range(col + 1, n):
-                    if B[row, col]:
-                        pivot = row
-                        break
-                if pivot is None:
-                    raise ValueError("A_target is not invertible over GF(2).")
-
-                B[col] ^= B[pivot]
-                ops.append((pivot, col))
-                B[pivot] ^= B[col]
-                ops.append((col, pivot))
-                B[col] ^= B[pivot]
-                ops.append((pivot, col))
-
-            for row in range(col + 1, n):
-                if B[row, col]:
-                    B[row] ^= B[col]
-                    ops.append((col, row))
-
-        for col in range(n - 1, -1, -1):
-            for row in range(col):
-                if B[row, col]:
-                    B[row] ^= B[col]
-                    ops.append((col, row))
-
-        if not np.array_equal(B, self._gf2_eye(n)):
-            raise RuntimeError("Failed to reduce linear map to identity.")
-
-        circ = QuantumCircuit(block.num_qubits, name=f"{block.name}_all2all_fix")
-        for control, target in reversed(ops):
-            circ.cx(control, target)
-        return circ
-
     def optimize_block(
-        self,
-        block: QuantumCircuit,
-        active_qubits: List[int],
+            self,
+            block: QuantumCircuit,
+            active_qubits: List[int],
     ) -> QuantumCircuit:
-        """
-        Optimize one compact block while preserving exact block equivalence.
-        """
         if block.num_qubits <= 1:
             return block.copy()
 
         local_graph = self._make_local_graph(active_qubits)
-        if not local_graph.nodes:
+
+        if local_graph.number_of_nodes() != block.num_qubits:
             return block.copy()
+
         if not nx.is_connected(local_graph):
             return block.copy()
 
-        P_abs, angles, A_orig = self._extract_phase_polynomial_and_linear_map(block)
-
-        phase_circ, A_phase = self._synthesize_phase_polynomial_topology_aware(
-            block=block,
-            P_abs=P_abs,
-            angles=angles,
-            graph=local_graph,
-        )
-
-        A_fix = self._gf2_matmul(A_orig, self._gf2_invert(A_phase))
-
         try:
-            fix_circ = self._steiner_gauss_synthesize(
+            P_abs, angles, A_orig = self._extract_phase_polynomial_and_linear_map(block)
+
+            phase_circ, A_phase = self._synthesize_phase_polynomial_topology_aware(
+                block=block,
+                P_abs=P_abs,
+                angles=angles,
+                graph=local_graph,
+            )
+
+            A_fix = self._gf2_matmul(A_orig, self._gf2_invert(A_phase))
+
+            # Temporary correctness-first replacement for broken Steiner-Gauss
+            fix_circ = self._synthesize_linear_map_graph_exact(
                 block=block,
                 A_target=A_fix,
                 graph=local_graph,
             )
-        except RuntimeError:
-            fix_all_to_all = self._synthesize_linear_map_all_to_all(block, A_fix)
-            fix_circ = self._route_cnot_only_circuit(fix_all_to_all, local_graph)
 
-        out = QuantumCircuit(block.num_qubits, name=f"{block.name}_topology_aware")
-        out.compose(phase_circ, inplace=True)
-        out.compose(fix_circ, inplace=True)
+            out = QuantumCircuit(block.num_qubits, name=f"{block.name}_topology_aware")
+            out.compose(phase_circ, inplace=True)
+            out.compose(fix_circ, inplace=True)
+
+        except Exception as exc:
+            print(
+                f"Warning: topology-aware optimization failed for block {block.name}. "
+                f"Keeping original block. Details: {exc}"
+            )
+            return block.copy()
+
+        if not self._blocks_equivalent(block, out):
+            print(
+                f"Warning: optimized block {block.name} failed full equivalence validation. "
+                f"Keeping original block."
+            )
+            return block.copy()
+
         return out
 
     @staticmethod
@@ -693,11 +850,26 @@ class TopologyAwarePhasePolyOptimizer:
             f"{stats['decision']}"
         )
 
+    def reconstruct_without_optimization(self) -> QuantumCircuit:
+        new_circuit = self.circuit.copy_empty_like()
+        new_circuit.global_phase = self.circuit.global_phase
+
+        i = 0
+        while i < len(self.circuit.data):
+            instr, qargs, cargs = self._inst_fields(self.circuit.data[i])
+            mapped_qargs = [new_circuit.qubits  [self.circuit.find_bit(q).index] for q in qargs]
+            mapped_cargs = [new_circuit.clbits[self.circuit.find_bit(c).index] for c in cargs]
+            new_circuit.append(instr.copy(), mapped_qargs, mapped_cargs)
+            i += 1
+
+        return new_circuit
+
     def replace_blocks(
-        self,
-        blocks: List[Tuple[int, int, List[int], List[Any]]],
-        debug: bool = False,
+            self,
+            blocks: List[Tuple[int, int, List[int], List[Any]]],
+            debug: bool = False,
     ) -> QuantumCircuit:
+        self.first_accepted_block_debug = None
         block_map = {}
 
         for block_id, (start, end, _, _) in enumerate(blocks, start=1):
@@ -714,33 +886,113 @@ class TopologyAwarePhasePolyOptimizer:
                 debug=debug,
             )
 
-            chosen_block = cand_block if use_candidate else orig_block
-            block_map[start] = (end, chosen_block, active_qubits)
+            # Only store accepted optimized candidates.
+            if use_candidate:
+                block_map[start] = (end, cand_block, active_qubits)
+
+                if self.first_accepted_block_debug is None:
+                    self.first_accepted_block_debug = {
+                        "block_id": block_id,
+                        "start": start,
+                        "end": end,
+                        "active_qubits": list(active_qubits),
+                        "orig_block": orig_block.copy(),
+                        "cand_block": cand_block.copy(),
+                        "stats": dict(stats),
+                    }
 
         new_circuit = self.circuit.copy_empty_like()
-        i = 0
+        new_circuit.global_phase = self.circuit.global_phase
 
+        i = 0
         while i < len(self.circuit.data):
             if i in block_map:
                 end, chosen_block, active_qubits = block_map[i]
 
                 for inst in chosen_block.data:
-                    instr, qargs, _ = self._inst_fields(inst)
+                    instr, qargs, cargs = self._inst_fields(inst)
                     mapped_qargs = [
                         new_circuit.qubits[active_qubits[chosen_block.find_bit(q).index]]
                         for q in qargs
                     ]
-                    new_circuit.append(instr, mapped_qargs, [])
+                    mapped_cargs = [new_circuit.clbits[chosen_block.find_bit(c).index] for c in cargs]
+                    new_circuit.append(instr.copy(), mapped_qargs, mapped_cargs)
 
                 i = end + 1
             else:
                 instr, qargs, cargs = self._inst_fields(self.circuit.data[i])
                 mapped_qargs = [new_circuit.qubits[self.circuit.find_bit(q).index] for q in qargs]
                 mapped_cargs = [new_circuit.clbits[self.circuit.find_bit(c).index] for c in cargs]
-                new_circuit.append(instr, mapped_qargs, mapped_cargs)
+                new_circuit.append(instr.copy(), mapped_qargs, mapped_cargs)
                 i += 1
 
         return new_circuit
+
+    def test_block_numerically(
+            self,
+            original: QuantumCircuit,
+            candidate: QuantumCircuit,
+            trials: int = 5,
+            atol: float = 1e-9,
+            verbose: bool = True,
+    ) -> dict:
+        """
+        Test two blocks numerically.
+
+        For small blocks (<= 8 qubits), also checks full operator equivalence.
+        For all blocks, checks action on several random input states.
+        """
+        result = {
+            "num_qubits": original.num_qubits,
+            "operator_equiv": None,
+            "random_state_trials": [],
+            "all_random_trials_passed": True,
+        }
+
+        if original.num_qubits != candidate.num_qubits:
+            result["all_random_trials_passed"] = False
+            if verbose:
+                print("Block test failed: qubit counts differ.")
+            return result
+
+        n = original.num_qubits
+
+        # Exact operator equivalence for small blocks
+        if n <= 8:
+            try:
+                op_equiv = Operator(original).equiv(Operator(candidate))
+                result["operator_equiv"] = bool(op_equiv)
+                if verbose:
+                    print(f"Operator equivalence (n={n}): {op_equiv}")
+            except Exception as exc:
+                result["operator_equiv"] = False
+                result["all_random_trials_passed"] = False
+                if verbose:
+                    print(f"Operator equivalence check failed: {exc}")
+
+        # Random-state tests
+        for seed in range(trials):
+            psi = random_statevector(2 ** n, seed=seed)
+            out_orig = psi.evolve(original)
+            out_cand = psi.evolve(candidate)
+
+            equiv = out_orig.equiv(out_cand)
+            fidelity = state_fidelity(out_orig, out_cand)
+
+            trial = {
+                "seed": seed,
+                "equiv": bool(equiv),
+                "fidelity": float(fidelity),
+            }
+            result["random_state_trials"].append(trial)
+
+            if verbose:
+                print(f"Trial {seed}: equiv={equiv}, fidelity={fidelity:.16f}")
+
+            if not equiv:
+                result["all_random_trials_passed"] = False
+
+        return result
 
     def optimize(self, debug: bool = False) -> QuantumCircuit:
         blocks = self.find_blocks()

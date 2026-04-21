@@ -1,7 +1,10 @@
 """A phase polynomial optimiser for quantum circuits."""
 
-from .phase_poly_optimize import PhasePolyOptimizer
-
+from .a2a_phase_poly import A2APhasePoly
+from .topology_aware_phase_poly import TopologyAwarePhasePolyOptimizer
+from. architecture_aware_phasepoly_optimizer import ArchitectureAwarePhasePolyOptimizer
 __all__ = [
-    "PhasePolyOptimizer",
+    "A2APhasePoly",
+    "TopologyAwarePhasePolyOptimizer",
+    "ArchitectureAwarePhasePolyOptimizer",
 ]
