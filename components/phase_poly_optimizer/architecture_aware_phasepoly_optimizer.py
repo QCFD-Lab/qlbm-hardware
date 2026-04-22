@@ -182,6 +182,139 @@ class ArchitectureGraph:
         g = self.graph if allowed is None else self.graph.subgraph(list(allowed))
         return nx.shortest_path(g, source=start, target=end)
 
+    def rec_steiner_tree_edges(
+            self,
+            root: int,
+            nodes: Sequence[int],
+            usable_nodes: Sequence[int],
+            rec_nodes: Sequence[int],
+            upper: bool = True,
+    ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+        """
+        Qiskit-native analogue of the repo's `architecture.rec_steiner_tree(...)`.
+
+        Returns
+        -------
+        top_down_edges:
+            Edges emitted in the first phase of the tree walk.
+        bottom_up_edges:
+            Edges emitted in the second phase of the tree walk.
+
+        Notes
+        -----
+        In the full-reduction phase (`upper=False`), edges are only bidirectional inside
+        `rec_nodes`. Outside that set, we keep only the orientation from larger index
+        to smaller index, which mirrors the reference implementation's restriction.
+        """
+        usable = list(dict.fromkeys(int(x) for x in usable_nodes))
+        required = list(dict.fromkeys(int(x) for x in nodes))
+        rec_set = set(int(x) for x in rec_nodes)
+
+        if root not in usable:
+            raise ValueError(f"Root {root} is not present in usable_nodes.")
+        for node in required:
+            if node not in usable:
+                raise ValueError(f"Required node {node} is not present in usable_nodes.")
+
+        # Build the directed connectivity used for shortest paths.
+        dg = nx.DiGraph()
+        dg.add_nodes_from(usable)
+
+        sub = self.graph.subgraph(usable)
+        for u, v in sub.edges():
+            if upper or (u in rec_set and v in rec_set):
+                dg.add_edge(u, v)
+                dg.add_edge(v, u)
+            else:
+                if u > v:
+                    dg.add_edge(u, v)
+                else:
+                    dg.add_edge(v, u)
+
+        # Build the spanning tree of shortest paths with `root` as start.
+        vertices = [root]
+        steiner_points: List[int] = []
+        pending = [node for node in required if node != root]
+        all_edges: List[Tuple[int, int]] = []
+
+        while pending:
+            options: List[Tuple[int, int, int, List[Tuple[int, int]]]] = []
+            frontier = vertices + steiner_points
+
+            for node in pending:
+                for v in frontier:
+                    if nx.has_path(dg, v, node):
+                        path = nx.shortest_path(dg, source=v, target=node)
+                        edge_path = [(path[i], path[i + 1]) for i in range(len(path) - 1)]
+                        options.append((node, v, len(edge_path), edge_path))
+
+            if not options:
+                raise ValueError(
+                    f"Could not connect pending Steiner node(s) {pending} from root {root} "
+                    f"inside usable_nodes={usable} with rec_nodes={list(rec_set)}."
+                )
+
+            node, _, _, edge_path = min(options, key=lambda x: x[2])
+
+            vertices.append(node)
+            all_edges.extend(edge_path)
+
+            for a, b in edge_path:
+                if a not in vertices and a not in steiner_points:
+                    steiner_points.append(a)
+                if b not in vertices and b not in steiner_points:
+                    steiner_points.append(b)
+
+            pending.remove(node)
+
+        all_edges = _dedup_edges_preserve_order(all_edges)
+
+        # First phase: walk top-down from the root.
+        top_down: List[Tuple[int, int]] = []
+        active = {root}
+        yielded = set()
+
+        while len(yielded) < len(all_edges):
+            emitted_this_round = False
+            old_active = list(active)
+
+            for edge in all_edges:
+                if edge in yielded:
+                    continue
+                src, dst = edge
+                if src in active:
+                    top_down.append(edge)
+                    yielded.add(edge)
+                    active.add(dst)
+                    emitted_this_round = True
+
+            for v in old_active:
+                active.discard(v)
+
+            if not emitted_this_round:
+                raise ValueError("Top-down Steiner tree walk got stuck.")
+
+        # Second phase: walk bottom-up from leaves.
+        remaining = list(all_edges)
+        bottom_up: List[Tuple[int, int]] = []
+
+        while remaining:
+            parents = {src for src, _ in remaining}
+            leaves = [v for v in vertices if v not in parents] + [v for v in steiner_points if v not in parents]
+
+            emitted_this_round = False
+            for leaf in leaves:
+                leaf_edges = [edge for edge in remaining if edge[1] == leaf]
+                for edge in leaf_edges:
+                    bottom_up.append(edge)
+                    remaining.remove(edge)
+                    emitted_this_round = True
+
+            if not emitted_this_round:
+                raise ValueError("Bottom-up Steiner tree walk got stuck.")
+
+        return top_down, bottom_up
+
     def rooted_steiner_tree_children(
         self,
         root: int,
@@ -480,43 +613,58 @@ def synthesize_phase_support_architecture_aware(
 # =========================
 
 
-def _steiner_fill_and_eliminate_column(
+def _steiner_reduce_column_recursive(
     work: Matrix,
     col: int,
     root: int,
-    children: Dict[int, List[int]],
+    nodes: Sequence[int],
+    usable_nodes: Sequence[int],
+    rec_nodes: Sequence[int],
+    upper: bool,
+    architecture: ArchitectureGraph,
     emit_row_add,
 ) -> None:
     """
-    Reduce one GF(2) column to the root using a rooted Steiner tree.
+    Closer Qiskit analogue of the repo's `steiner_reduce_column(...)`.
 
-    After completion, the column has value 1 on `root` and 0 on every other node
-    in the tree. The row operations are emitted through `emit_row_add(control, target)`.
+    It uses the repo-style two-phase tree walk:
+    1. top-down pass
+    2. bottom-up pass
     """
+    if len(nodes) <= 1:
+        return
 
-    def fill(node: int) -> None:
-        for child in children.get(node, []):
-            fill(child)
-        if work[node][col] == 1:
-            return
-        for child in children.get(node, []):
-            if work[child][col] == 1:
-                emit_row_add(child, node)
-                return
+    top_down, bottom_up = architecture.rec_steiner_tree_edges(
+        root=root,
+        nodes=list(nodes),
+        usable_nodes=list(usable_nodes),
+        rec_nodes=list(rec_nodes),
+        upper=upper,
+    )
 
-    def eliminate(node: int) -> None:
-        for child in children.get(node, []):
-            eliminate(child)
-            if work[child][col] == 1:
-                emit_row_add(node, child)
+    if upper:
+        zeros: List[Tuple[int, int]] = []
+        for s0, s1 in top_down:
+            if work[s0][col] == 0:
+                zeros.append((s0, s1))
 
-    fill(root)
-    if work[root][col] != 1:
-        raise ValueError(
-            f"Failed to create pivot 1 at row {root} for column {col}. "
-            "The active architecture subgraph may be unsuitable for this reduction step."
-        )
-    eliminate(root)
+        for s0, s1 in reversed(zeros):
+            if work[s0][col] == 0:
+                emit_row_add(s1, s0)
+
+        if work[root][col] != 1:
+            raise ValueError(
+                f"Upper Steiner reduction failed to create pivot 1 at row {root} for column {col}."
+            )
+    else:
+        # Repo behaviour in the full-reduction phase.
+        for s0, s1 in top_down:
+            if work[s1][col] == 0:
+                emit_row_add(s0, s1)
+
+    for s0, s1 in bottom_up:
+        if work[s1][col] == 1:
+            emit_row_add(s0, s1)
 
 
 
@@ -526,17 +674,12 @@ def synthesize_linear_transform_steiner_gauss(
 ) -> QuantumCircuit:
     """
     Architecture-aware synthesis of an invertible GF(2) linear transform using a
-    Steiner-tree-based Gaussian elimination.
+    recursive Steiner-Gauss structure closer to the reference repo.
 
-    This is a Qiskit-native replacement for the temporary "all-to-all + transpile"
-    residual fallback. It keeps every emitted CNOT architecture-compliant directly.
-
-    Notes
-    -----
-    This first port focuses on correctness and mirrors the Steiner-tree column
-    reduction idea from the reference implementation. It is not yet a line-by-line
-    reproduction of the repo's recursive `rec_steiner_gauss(...)`, but it removes
-    the routed fallback and keeps the residual stage natively architecture-aware.
+    This version mirrors the repo at a higher level:
+    - first perform an upper-triangular pass
+    - collect pivot columns
+    - then do the full reduction recursively on shortest-path subproblems
     """
     work = gf2_matrix_from_rows(matrix_rows)
     n = len(work)
@@ -550,31 +693,84 @@ def synthesize_linear_transform_steiner_gauss(
 
     def emit_row_add(control: int, target: int) -> None:
         if not architecture.graph.has_edge(control, target):
-            raise ValueError(f"Attempted non-adjacent row add {control}->{target} in Steiner-Gauss synthesis.")
+            raise ValueError(
+                f"Attempted non-adjacent row add {control}->{target} in Steiner-Gauss synthesis."
+            )
         _apply_row_add(work, control, target)
         ops.append((control, target))
 
-    # Forward elimination: clear below each pivot.
-    for col in range(n):
-        active_rows = list(range(col, n))
-        ones = [r for r in active_rows if work[r][col] == 1]
-        if not ones:
-            raise ValueError("Residual linear transform is not invertible over GF(2).")
-        terminals = sorted(set(ones) | {col})
-        children = architecture.rooted_steiner_tree_children(root=col, terminals=terminals, allowed=active_rows)
-        _steiner_fill_and_eliminate_column(work, col, root=col, children=children, emit_row_add=emit_row_add)
-        if work[col][col] != 1 or any(work[r][col] != 0 for r in range(col + 1, n)):
-            raise ValueError(f"Forward Steiner-Gauss step failed on column {col}.")
+    def rec_step(cols: List[int], rows: List[int]) -> None:
+        if not cols or not rows:
+            return
 
-    # Backward elimination: clear above each pivot.
-    for col in reversed(range(n)):
-        active_rows = list(range(0, col + 1))
-        ones = [r for r in active_rows if work[r][col] == 1]
-        terminals = sorted(set(ones) | {col})
-        children = architecture.rooted_steiner_tree_children(root=col, terminals=terminals, allowed=active_rows)
-        _steiner_fill_and_eliminate_column(work, col, root=col, children=children, emit_row_add=emit_row_add)
-        if any(work[r][col] != 0 for r in range(0, col)) or work[col][col] != 1:
-            raise ValueError(f"Backward Steiner-Gauss step failed on column {col}.")
+        size = len(rows)
+        pivot = 0
+        pivot_cols: List[int] = []
+
+        rows2 = [r for r in range(n) if r in rows]
+        cols2 = [c for c in range(n) if c in cols]
+
+        # Upper-triangular pass.
+        for i, c in enumerate(cols2):
+            if pivot >= size:
+                break
+
+            root = rows2[pivot]
+            nodes = [r for r in rows2[pivot:] if r == root or work[r][c] == 1]
+
+            _steiner_reduce_column_recursive(
+                work=work,
+                col=c,
+                root=root,
+                nodes=nodes,
+                usable_nodes=cols2[i:],
+                rec_nodes=[],
+                upper=True,
+                architecture=architecture,
+                emit_row_add=emit_row_add,
+            )
+
+            if work[root][c] == 1:
+                pivot_cols.append(c)
+                pivot += 1
+
+        # Full reduction / recursive phase.
+        pivot -= 1
+        for i, c in enumerate(cols):
+            if c not in pivot_cols:
+                continue
+
+            root = rows[pivot]
+            nodes = [r for r in rows if r == root or work[r][c] == 1]
+            usable_nodes = cols[i:]
+
+            if not usable_nodes:
+                pivot -= 1
+                continue
+
+            path_end = max(usable_nodes)
+            rec_nodes = architecture.shortest_path(c, path_end, usable_nodes)
+
+            if len(nodes) > 1:
+                _steiner_reduce_column_recursive(
+                    work=work,
+                    col=c,
+                    root=root,
+                    nodes=nodes,
+                    usable_nodes=cols,
+                    rec_nodes=rec_nodes,
+                    upper=False,
+                    architecture=architecture,
+                    emit_row_add=emit_row_add,
+                )
+
+            if len(rec_nodes) > 1:
+                rec_step(list(reversed(rec_nodes)), rec_nodes)
+
+            pivot -= 1
+
+    reduce_order = list(range(n - 1, -1, -1))
+    rec_step(reduce_order, list(reversed(reduce_order)))
 
     if work != gf2_matrix_from_rows(gf2_identity(n)):
         raise ValueError("Steiner-Gauss synthesis ended in a non-identity matrix.")
@@ -641,6 +837,38 @@ def synthesize_linear_transform_all_to_all(matrix_rows: Sequence[BitVec]) -> Qua
         qc.cx(control, target)
     return qc
 
+
+def _tree_top_down_edges(children: Dict[int, List[int]], root: int) -> List[Tuple[int, int]]:
+    edges: List[Tuple[int, int]] = []
+
+    def walk(node: int) -> None:
+        for child in children.get(node, []):
+            edges.append((node, child))
+            walk(child)
+
+    walk(root)
+    return edges
+
+
+def _tree_bottom_up_edges(children: Dict[int, List[int]], root: int) -> List[Tuple[int, int]]:
+    edges: List[Tuple[int, int]] = []
+
+    def walk(node: int) -> None:
+        for child in children.get(node, []):
+            walk(child)
+            edges.append((node, child))
+
+    walk(root)
+    return edges
+
+def _dedup_edges_preserve_order(edges: Sequence[Tuple[int, int]]) -> List[Tuple[int, int]]:
+    seen = set()
+    out: List[Tuple[int, int]] = []
+    for edge in edges:
+        if edge not in seen:
+            out.append(edge)
+            seen.add(edge)
+    return out
 
 
 def residual_linear_transform(

@@ -312,3 +312,9 @@ for r in results:
 sg_results = run_steiner_gauss_sanity_tests()
 for r in sg_results:
     print(r["name"], r["ok"], r["cx"], r["depth"])
+
+
+opt = ArchitectureAwarePhasePolyOptimizer(keep_original_if_worse=False)
+qc, cmap = _toy_block_four_qubit_line()
+out = opt.optimize(qc, cmap)
+print(unitary_equiv_up_to_global_phase(qc, out), qc.count_ops().get("cx", 0), out.count_ops().get("cx", 0))
