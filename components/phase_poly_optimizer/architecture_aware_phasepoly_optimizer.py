@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from collections import OrderedDict
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import networkx as nx
 import numpy as np
@@ -121,7 +121,7 @@ class PhasePolynomial:
         Number of logical qubits in the block.
     """
 
-    zphases: "OrderedDict[BitVec, float]"
+    zphases: "OrderedDict[BitVec, Any]"
     out_parities: List[BitVec]
     num_qubits: int
 
@@ -131,8 +131,13 @@ class PhasePolynomial:
     def remove_zero_phases(self, atol: float = 1e-12) -> None:
         kept = OrderedDict()
         for parity, phase in self.zphases.items():
-            if abs(float(phase)) > atol:
-                kept[parity] = float(phase)
+            try:
+                numeric_phase = float(phase)
+            except (TypeError, ValueError):
+                kept[parity] = phase
+                continue
+            if abs(numeric_phase) > atol:
+                kept[parity] = numeric_phase
         self.zphases = kept
 
 
@@ -140,7 +145,7 @@ class PhasePolynomial:
 class PhaseColumn:
     column_id: int
     bits: List[int]
-    angle: float
+    angle: Any
 
 
 @dataclass
@@ -422,7 +427,7 @@ def extract_phase_polynomial(block: QuantumCircuit) -> PhasePolynomial:
         if name == "rz":
             target_idx = qubit_to_index[instruction.qubits[0]]
             parity = current_parities[target_idx]
-            angle = float(op.params[0])
+            angle = op.params[0]
             zphases[parity] = zphases.get(parity, 0.0) + angle
             continue
 
@@ -462,7 +467,7 @@ class _RecursiveSynthState:
     def from_phase_poly(cls, phase_poly: PhasePolynomial, *, debug: bool = False) -> "_RecursiveSynthState":
         columns: Dict[int, PhaseColumn] = {}
         for cid, (parity, angle) in enumerate(phase_poly.zphases.items()):
-            columns[cid] = PhaseColumn(column_id=cid, bits=list(parity), angle=float(angle))
+            columns[cid] = PhaseColumn(column_id=cid, bits=list(parity), angle=angle)
         return cls(
             num_qubits=phase_poly.num_qubits,
             columns=columns,
@@ -911,6 +916,32 @@ def _choose_better_phasepoly_block(
     return original
 
 
+def _cx_gates_respect_coupling_map(circuit: QuantumCircuit, coupling_map: CouplingMap) -> bool:
+    """
+    Return whether every CX in `circuit` is adjacent in the undirected architecture.
+
+    The paper treats the architecture graph as undirected. This helper follows the
+    same convention, so either edge orientation in a Qiskit CouplingMap is accepted.
+    """
+    graph = nx.Graph()
+    graph.add_nodes_from(range(circuit.num_qubits))
+    graph.add_edges_from(
+        (int(u), int(v))
+        for u, v in coupling_map.get_edges()
+        if u < circuit.num_qubits and v < circuit.num_qubits
+    )
+    qmap = _qubit_index_map(circuit)
+
+    for instruction in circuit.data:
+        if instruction.operation.name != "cx":
+            continue
+        control = qmap[instruction.qubits[0]]
+        target = qmap[instruction.qubits[1]]
+        if not graph.has_edge(control, target):
+            return False
+    return True
+
+
 # =========================
 # Emission helpers
 # =========================
@@ -1000,7 +1031,7 @@ class ArchitectureAwarePhasePolyOptimizer:
             if not equivalent:
                 raise ValueError("Synthesized circuit is not equivalent to the input block.")
 
-        if self.keep_original_if_worse:
+        if self.keep_original_if_worse and _cx_gates_respect_coupling_map(circuit, coupling_map):
             return _choose_better_phasepoly_block(circuit, candidate)
 
         return candidate
