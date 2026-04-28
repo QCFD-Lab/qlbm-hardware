@@ -24,11 +24,11 @@ def load_statevector(path_to_statevector: str) -> Statevector:
     return Statevector(vec)
 
 
-def compare_statevectors(dir_unoptimized: str, dir_optimized: str, tolerance: float = 1e-6) -> Tuple[bool, List[str]]:
+def compare_statevectors(dir_unoptimized: str, dir_optimized: str, tolerance: float = 1e-6) -> dict:
     """
     Compare statevector files between optimized and unoptimized simulation outputs.
 
-    Uses Qiskit Statevector.equiv() which properly handles global phase differences.
+    Internally uses compare_statevectors_ignoring_global_phase() for each file pair.
 
     Args:
         dir_unoptimized: Path to unoptimized simulation output directory
@@ -36,57 +36,70 @@ def compare_statevectors(dir_unoptimized: str, dir_optimized: str, tolerance: fl
         tolerance: Numerical tolerance for comparison (default: 1e-6)
 
     Returns:
-        (all_match, differences)
+        dict with:
         - all_match: True if all statevectors are equivalent within tolerance
         - differences: List of strings describing any mismatches found
+        - file_results: List of detailed comparison dicts for each file pair
     """
     statevectors_dir_unopt = Path(dir_unoptimized) / "statevectors"
     statevectors_dir_opt = Path(dir_optimized) / "statevectors"
 
     if not statevectors_dir_unopt.exists():
-        return False, [f"Unoptimized statevectors directory not found: {statevectors_dir_unopt}"]
+        return {
+            "all_match": False,
+            "differences": [f"Unoptimized statevectors directory not found: {statevectors_dir_unopt}"],
+            "file_results": [],
+        }
     if not statevectors_dir_opt.exists():
-        return False, [f"Optimized statevectors directory not found: {statevectors_dir_opt}"]
+        return {
+            "all_match": False,
+            "differences": [f"Optimized statevectors directory not found: {statevectors_dir_opt}"],
+            "file_results": [],
+        }
 
     files_unopt = sorted(statevectors_dir_unopt.glob("step_*.npy"))
     files_opt = sorted(statevectors_dir_opt.glob("step_*.npy"))
 
     if len(files_unopt) != len(files_opt):
-        return False, [
-            f"Number of statevector files mismatch: "
-            f"Unoptimized={len(files_unopt)}, Optimized={len(files_opt)}"
-        ]
+        return {
+            "all_match": False,
+            "differences": [
+                f"Number of statevector files mismatch: "
+                f"Unoptimized={len(files_unopt)}, Optimized={len(files_opt)}"
+            ],
+            "file_results": [],
+        }
 
     differences = []
     all_match = True
+    file_results = []
 
     for file_unopt, file_opt in zip(files_unopt, files_opt):
         step_name = file_unopt.name
         try:
-            sv_unopt = load_statevector(file_unopt)
-            sv_opt = load_statevector(file_opt)
+            result = compare_statevectors_ignoring_global_phase(
+                file_unopt, file_opt, tolerance=tolerance
+            )
+            file_results.append(result)
         except Exception as e:
-            differences.append(f"Failed to load {step_name}: {e}")
+            differences.append(f"Failed to compare {step_name}: {e}")
             all_match = False
+            file_results.append({"error": str(e)})
             continue
 
-        if not sv_unopt.equiv(sv_opt, atol=tolerance):
-            # Align the global phase
-            inner = np.vdot(sv_unopt.data, sv_opt.data)
-            if inner != 0:
-                sv_opt_aligned = sv_opt.data * np.exp(-1j * np.angle(inner))
-                distance = np.linalg.norm(sv_unopt.data - sv_opt_aligned)
-            else:
-                sv_opt_aligned = sv_opt.data
-                distance = np.linalg.norm(sv_unopt.data - sv_opt_aligned)
-
+        if not result["statevectors_equal_ignoring_phase"]:
             differences.append(
                 f"{step_name}: Not equivalent - "
-                f"Distance={distance:.6e}"
+                f"Max absolute difference={result['max_absolute_difference']:.6e}, "
+                f"Overlap={result['overlap_abs']:.6e}"
             )
             all_match = False
 
-    return all_match, differences
+    return {
+        "all_match": all_match,
+        "differences": differences,
+        "file_results": file_results,
+    }
 
 
 def compare_statevectors_ignoring_global_phase(file1_path, file2_path, tolerance=1e-10):

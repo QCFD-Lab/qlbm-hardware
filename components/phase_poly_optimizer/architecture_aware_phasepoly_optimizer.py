@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import networkx as nx
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.circuit import Qubit
+from qiskit.circuit import Clbit, Qubit
 from qiskit.transpiler import CouplingMap
 from qiskit.quantum_info import Operator
 
@@ -146,6 +146,49 @@ class PhaseColumn:
     column_id: int
     bits: List[int]
     angle: Any
+
+
+@dataclass(frozen=True)
+class PhasePolynomialBlock:
+    start: int
+    end: int
+    active_qubits: List[int]
+    phase_instruction_indices: List[int]
+    passthrough_instruction_indices: List[int]
+
+
+@dataclass
+class BlockOptimizationReport:
+    start: int
+    end: int
+    active_qubits: List[int]
+    connected_active_subgraph: bool
+    support_size: int
+    original_cx: int
+    phase_support_cx: int
+    residual_cx: int
+    candidate_cx: int
+    final_cx: int
+    kept_original: bool
+
+
+@dataclass
+class OptimizationRunReport:
+    circuit_num_qubits: int
+    num_blocks: int
+    block_reports: List[BlockOptimizationReport]
+
+    @property
+    def total_original_cx(self) -> int:
+        return sum(block.original_cx for block in self.block_reports)
+
+    @property
+    def total_candidate_cx(self) -> int:
+        return sum(block.candidate_cx for block in self.block_reports)
+
+    @property
+    def total_final_cx(self) -> int:
+        return sum(block.final_cx for block in self.block_reports)
 
 
 @dataclass
@@ -366,6 +409,24 @@ class ArchitectureGraph:
         out = [q for q in sub_nodes if q not in articulation]
         return out if out else sub_nodes[:]
 
+    def heuristic_reduce_order(self, nodes: Optional[Sequence[int]] = None) -> List[int]:
+        """
+        Compute an elimination order by repeatedly removing low-degree non-cutting
+        vertices. This is a generic analogue of the repo's architecture-specific
+        `reduce_order` and is used for residual Steiner-Gauss synthesis.
+        """
+        remaining = list(self.graph.nodes if nodes is None else nodes)
+        order: List[int] = []
+
+        while remaining:
+            candidates = self.non_cutting_vertices(remaining)
+            sub = self.graph.subgraph(remaining)
+            chosen = min(candidates, key=lambda q: (sub.degree[q], -q))
+            order.append(chosen)
+            remaining.remove(chosen)
+
+        return order
+
 
 # =========================
 # Block validation/extraction
@@ -380,19 +441,217 @@ def _qubit_index_map(circuit: QuantumCircuit) -> Dict[Qubit, int]:
     return {qubit: i for i, qubit in enumerate(circuit.qubits)}
 
 
+def _clbit_index_map(circuit: QuantumCircuit) -> Dict[Clbit, int]:
+    return {clbit: i for i, clbit in enumerate(circuit.clbits)}
+
+
+def _is_phase_polynomial_instruction(instruction, *, allow_barriers: bool = True) -> bool:
+    name = instruction.operation.name
+    if name == "barrier" and allow_barriers:
+        return True
+    if name == "rz":
+        return len(instruction.qubits) == 1 and len(instruction.clbits) == 0
+    if name == "cx":
+        return len(instruction.qubits) == 2 and len(instruction.clbits) == 0
+    return False
+
+
+def _is_soft_passthrough_instruction(instruction) -> bool:
+    """
+    Return whether this instruction may be moved across a phase-polynomial block
+    when it acts on qubits disjoint from the block's phase support.
+    """
+    return (
+        instruction.operation.name in {"x", "sx"}
+        and len(instruction.clbits) == 0
+        and len(instruction.qubits) == 1
+    )
+
+
+def find_phase_polynomial_blocks(
+    circuit: QuantumCircuit,
+    *,
+    allow_barriers: bool = True,
+) -> List[PhasePolynomialBlock]:
+    """
+    Find maximal contiguous phase-polynomial blocks in a mixed circuit.
+
+    Blocks are contiguous ranges containing only CX/RZ instructions, plus barriers
+    when `allow_barriers` is enabled. The returned `active_qubits` list is a stable
+    local-to-global qubit map for compact block synthesis.
+    """
+    qmap = _qubit_index_map(circuit)
+    blocks: List[PhasePolynomialBlock] = []
+    data = circuit.data
+    num_instructions = len(data)
+    index = 0
+
+    while index < num_instructions:
+        while index < num_instructions and not _is_phase_polynomial_instruction(data[index], allow_barriers=allow_barriers):
+            index += 1
+        if index >= num_instructions:
+            break
+
+        segment_end = index
+        while (
+            segment_end + 1 < num_instructions
+            and (
+                _is_phase_polynomial_instruction(data[segment_end + 1], allow_barriers=allow_barriers)
+                or _is_soft_passthrough_instruction(data[segment_end + 1])
+            )
+        ):
+            segment_end += 1
+
+        suffix_phase_qubits: Dict[int, set[int]] = {segment_end + 1: set()}
+        for pos in range(segment_end, index - 1, -1):
+            suffix_phase_qubits[pos] = set(suffix_phase_qubits[pos + 1])
+            if _is_phase_polynomial_instruction(data[pos], allow_barriers=allow_barriers):
+                suffix_phase_qubits[pos].update(qmap[qubit] for qubit in data[pos].qubits)
+
+        cursor = index
+        while cursor <= segment_end:
+            while (
+                cursor <= segment_end
+                and not _is_phase_polynomial_instruction(data[cursor], allow_barriers=allow_barriers)
+            ):
+                cursor += 1
+            if cursor > segment_end:
+                break
+
+            start = cursor
+            active_phase_qubits: set[int] = set()
+            phase_instruction_indices: List[int] = []
+            passthrough_instruction_indices: List[int] = []
+
+            while cursor <= segment_end:
+                instruction = data[cursor]
+                if _is_phase_polynomial_instruction(instruction, allow_barriers=allow_barriers):
+                    phase_instruction_indices.append(cursor)
+                    active_phase_qubits.update(qmap[qubit] for qubit in instruction.qubits)
+                    cursor += 1
+                    continue
+
+                if _is_soft_passthrough_instruction(instruction):
+                    instruction_qubits = {qmap[qubit] for qubit in instruction.qubits}
+                    future_phase_qubits = suffix_phase_qubits[cursor + 1]
+                    if instruction_qubits.isdisjoint(active_phase_qubits | future_phase_qubits):
+                        passthrough_instruction_indices.append(cursor)
+                        cursor += 1
+                        continue
+                break
+
+            if phase_instruction_indices:
+                blocks.append(
+                    PhasePolynomialBlock(
+                        start=start,
+                        end=cursor - 1,
+                        active_qubits=sorted(active_phase_qubits),
+                        phase_instruction_indices=phase_instruction_indices,
+                        passthrough_instruction_indices=passthrough_instruction_indices,
+                    )
+                )
+            else:
+                cursor += 1
+
+        index = segment_end + 1
+
+    return blocks
+
+
+def _extract_compact_block(
+    circuit: QuantumCircuit,
+    block: PhasePolynomialBlock,
+) -> QuantumCircuit:
+    local_of_global = {global_index: local_index for local_index, global_index in enumerate(block.active_qubits)}
+    qmap = _qubit_index_map(circuit)
+    compact = QuantumCircuit(len(block.active_qubits), name=f"phasepoly_{block.start}_{block.end}")
+
+    for index in block.phase_instruction_indices:
+        instruction = circuit.data[index]
+        local_qargs = [compact.qubits[local_of_global[qmap[qubit]]] for qubit in instruction.qubits]
+        compact.append(instruction.operation.copy(), local_qargs, [])
+
+    return compact
+
+
+def _local_coupling_map(coupling_map: CouplingMap, active_qubits: Sequence[int]) -> CouplingMap:
+    active_set = set(active_qubits)
+    local_of_global = {global_index: local_index for local_index, global_index in enumerate(active_qubits)}
+    local_edges = [
+        (local_of_global[int(u)], local_of_global[int(v)])
+        for u, v in coupling_map.get_edges()
+        if int(u) in active_set and int(v) in active_set and int(u) != int(v)
+    ]
+    return CouplingMap(local_edges)
+
+
+def _active_qubit_subgraph_is_connected(coupling_map: CouplingMap, active_qubits: Sequence[int]) -> bool:
+    if len(active_qubits) <= 1:
+        return True
+    active_set = set(active_qubits)
+    graph = nx.Graph()
+    graph.add_nodes_from(active_qubits)
+    graph.add_edges_from(
+        (int(u), int(v))
+        for u, v in coupling_map.get_edges()
+        if int(u) in active_set and int(v) in active_set and int(u) != int(v)
+    )
+    return nx.is_connected(graph)
+
+
+def _new_like_circuit(circuit: QuantumCircuit) -> QuantumCircuit:
+    out = circuit.copy_empty_like()
+    out.global_phase = circuit.global_phase
+    out.name = circuit.name
+    if circuit.metadata is not None:
+        out.metadata = dict(circuit.metadata)
+    return out
+
+
+def _append_original_instruction(
+    out: QuantumCircuit,
+    source: QuantumCircuit,
+    instruction,
+) -> None:
+    qmap = _qubit_index_map(source)
+    cmap = _clbit_index_map(source)
+    qargs = [out.qubits[qmap[qubit]] for qubit in instruction.qubits]
+    cargs = [out.clbits[cmap[clbit]] for clbit in instruction.clbits]
+    out.append(instruction.operation.copy(), qargs, cargs)
+
+
+def _append_compact_circuit(
+    out: QuantumCircuit,
+    compact: QuantumCircuit,
+    active_qubits: Sequence[int],
+) -> None:
+    for instruction in compact.data:
+        qargs = [out.qubits[active_qubits[compact.find_bit(qubit).index]] for qubit in instruction.qubits]
+        out.append(instruction.operation.copy(), qargs, [])
+
+
+def _append_instruction_indices(
+    out: QuantumCircuit,
+    source: QuantumCircuit,
+    instruction_indices: Sequence[int],
+) -> None:
+    for instruction_index in instruction_indices:
+        _append_original_instruction(out, source, source.data[instruction_index])
+
+
+def _append_instruction_range(
+    out: QuantumCircuit,
+    source: QuantumCircuit,
+    start: int,
+    end: int,
+) -> None:
+    for instruction_index in range(start, end + 1):
+        _append_original_instruction(out, source, source.data[instruction_index])
 
 def is_phase_polynomial_block(circuit: QuantumCircuit, *, allow_barriers: bool = True) -> bool:
     """Return True iff the circuit contains only CX, RZ, and optionally barriers."""
     for instruction in circuit.data:
-        op = instruction.operation
-        name = op.name
-        if name == "barrier" and allow_barriers:
-            continue
-        if name not in {"cx", "rz"}:
-            return False
-        if name == "rz" and len(instruction.qubits) != 1:
-            return False
-        if name == "cx" and len(instruction.qubits) != 2:
+        if not _is_phase_polynomial_instruction(instruction, allow_barriers=allow_barriers):
             return False
     return True
 
@@ -415,7 +674,7 @@ def extract_phase_polynomial(block: QuantumCircuit) -> PhasePolynomial:
 
     # One parity per currently-carried wire label.
     current_parities: List[BitVec] = gf2_identity(num_qubits)
-    zphases: "OrderedDict[BitVec, float]" = OrderedDict()
+    zphases: "OrderedDict[BitVec, Any]" = OrderedDict()
 
     for instruction in block.data:
         op = instruction.operation
@@ -676,6 +935,8 @@ def _steiner_reduce_column_recursive(
 def synthesize_linear_transform_steiner_gauss(
     matrix_rows: Sequence[BitVec],
     coupling_map: CouplingMap,
+    *,
+    reduce_order: Optional[Sequence[int]] = None,
 ) -> QuantumCircuit:
     """
     Architecture-aware synthesis of an invertible GF(2) linear transform using a
@@ -774,7 +1035,12 @@ def synthesize_linear_transform_steiner_gauss(
 
             pivot -= 1
 
-    reduce_order = list(range(n - 1, -1, -1))
+    if reduce_order is None:
+        reduce_order = architecture.heuristic_reduce_order()
+    else:
+        reduce_order = list(reduce_order)
+    if sorted(reduce_order) != list(range(n)):
+        raise ValueError("reduce_order must be a permutation of range(n).")
     rec_step(reduce_order, list(reversed(reduce_order)))
 
     if work != gf2_matrix_from_rows(gf2_identity(n)):
@@ -985,7 +1251,7 @@ class ArchitectureAwarePhasePolyOptimizer:
     phase-polynomial synthesis algorithm.
 
     Current stage:
-    - validates phase-polynomial blocks
+    - finds maximal phase-polynomial blocks in mixed circuits
     - extracts a faithful internal representation
     - synthesizes the phase-support part using the paper's recursion
     - computes the final residual linear transform A * P'^-1
@@ -993,25 +1259,19 @@ class ArchitectureAwarePhasePolyOptimizer:
     - optionally keeps the original block if the synthesized result is worse by cost
 
     Remaining work:
-    - maximal block extraction from mixed circuits
     - making the Steiner-Gauss port closer to the reference implementation for better CX counts
-    - optional placement when coupling_map has more qubits than the circuit
     """
 
     allow_barriers: bool = True
     debug: bool = False
     keep_original_if_worse: bool = True
+    last_run_report: Optional[OptimizationRunReport] = None
 
-    def optimize(self, circuit: QuantumCircuit, coupling_map: CouplingMap) -> QuantumCircuit:
-        if not isinstance(coupling_map, CouplingMap):
-            raise TypeError("coupling_map must be a qiskit.transpiler.CouplingMap")
-
-        if not is_phase_polynomial_block(circuit, allow_barriers=self.allow_barriers):
-            raise NotImplementedError(
-                "This stepwise implementation currently supports only full circuits that are already phase-polynomial blocks. "
-                "Block partitioning for mixed circuits will be added later."
-            )
-
+    def _optimize_phase_polynomial_block(
+        self,
+        circuit: QuantumCircuit,
+        coupling_map: CouplingMap,
+    ) -> Tuple[QuantumCircuit, BlockOptimizationReport]:
         phase_poly = extract_phase_polynomial(circuit)
         phase_circuit, emitted_out_parities = synthesize_phase_support_architecture_aware(
             phase_poly,
@@ -1031,10 +1291,107 @@ class ArchitectureAwarePhasePolyOptimizer:
             if not equivalent:
                 raise ValueError("Synthesized circuit is not equivalent to the input block.")
 
+        kept_original = False
+        final_circuit = candidate
         if self.keep_original_if_worse and _cx_gates_respect_coupling_map(circuit, coupling_map):
-            return _choose_better_phasepoly_block(circuit, candidate)
+            final_circuit = _choose_better_phasepoly_block(circuit, candidate)
+            kept_original = final_circuit is circuit
 
-        return candidate
+        report = BlockOptimizationReport(
+            start=0,
+            end=max(len(circuit.data) - 1, 0),
+            active_qubits=list(range(circuit.num_qubits)),
+            connected_active_subgraph=True,
+            support_size=len(phase_poly.support()),
+            original_cx=int(circuit.count_ops().get("cx", 0)),
+            phase_support_cx=int(phase_circuit.count_ops().get("cx", 0)),
+            residual_cx=int(residual_circuit.count_ops().get("cx", 0)),
+            candidate_cx=int(candidate.count_ops().get("cx", 0)),
+            final_cx=int(final_circuit.count_ops().get("cx", 0)),
+            kept_original=kept_original,
+        )
+
+        return final_circuit, report
+
+    def optimize(self, circuit: QuantumCircuit, coupling_map: CouplingMap) -> QuantumCircuit:
+        if not isinstance(coupling_map, CouplingMap):
+            raise TypeError("coupling_map must be a qiskit.transpiler.CouplingMap")
+
+        if is_phase_polynomial_block(circuit, allow_barriers=self.allow_barriers):
+            optimized, report = self._optimize_phase_polynomial_block(circuit, coupling_map)
+            self.last_run_report = OptimizationRunReport(
+                circuit_num_qubits=circuit.num_qubits,
+                num_blocks=1,
+                block_reports=[report],
+            )
+            return optimized
+
+        blocks = find_phase_polynomial_blocks(circuit, allow_barriers=self.allow_barriers)
+        if not blocks:
+            self.last_run_report = OptimizationRunReport(
+                circuit_num_qubits=circuit.num_qubits,
+                num_blocks=0,
+                block_reports=[],
+            )
+            return circuit.copy()
+
+        block_by_start = {block.start: block for block in blocks}
+        out = _new_like_circuit(circuit)
+        index = 0
+        block_reports: List[BlockOptimizationReport] = []
+
+        while index < len(circuit.data):
+            block = block_by_start.get(index)
+            if block is None:
+                _append_original_instruction(out, circuit, circuit.data[index])
+                index += 1
+                continue
+
+            compact = _extract_compact_block(circuit, block)
+            local_coupling_map = _local_coupling_map(coupling_map, block.active_qubits)
+
+            if _active_qubit_subgraph_is_connected(coupling_map, block.active_qubits):
+                optimized_block, report = self._optimize_phase_polynomial_block(compact, local_coupling_map)
+            else:
+                optimized_block = compact
+                support_size = len(extract_phase_polynomial(compact).support())
+                report = BlockOptimizationReport(
+                    start=block.start,
+                    end=block.end,
+                    active_qubits=list(block.active_qubits),
+                    connected_active_subgraph=False,
+                    support_size=support_size,
+                    original_cx=int(compact.count_ops().get("cx", 0)),
+                    phase_support_cx=0,
+                    residual_cx=0,
+                    candidate_cx=int(compact.count_ops().get("cx", 0)),
+                    final_cx=int(compact.count_ops().get("cx", 0)),
+                    kept_original=True,
+                )
+
+            report.start = block.start
+            report.end = block.end
+            report.active_qubits = list(block.active_qubits)
+            report.connected_active_subgraph = _active_qubit_subgraph_is_connected(coupling_map, block.active_qubits)
+            block_reports.append(report)
+
+            if block.passthrough_instruction_indices and report.candidate_cx >= report.original_cx:
+                report.final_cx = report.original_cx
+                report.kept_original = True
+                _append_instruction_range(out, circuit, block.start, block.end)
+                index = block.end + 1
+                continue
+
+            _append_instruction_indices(out, circuit, block.passthrough_instruction_indices)
+            _append_compact_circuit(out, optimized_block, block.active_qubits)
+            index = block.end + 1
+
+        self.last_run_report = OptimizationRunReport(
+            circuit_num_qubits=circuit.num_qubits,
+            num_blocks=len(blocks),
+            block_reports=block_reports,
+        )
+        return out
 
 
 def unitary_equiv_up_to_global_phase(
