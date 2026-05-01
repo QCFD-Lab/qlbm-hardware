@@ -16,6 +16,26 @@
       "ry": 50e-9,
       "cz": 200e-9,
       "cx": 200e-9
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "rx": 50e-9,
+      "ry": 50e-9,
+      "cz": 200e-9,
+      "cx": 200e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "rx": 0.999,
+      "ry": 0.999,
+      "cz": 0.99,
+      "cx": 0.99
+    },
+    "measurement_time_s": 1e-6,
+    "measurement_fidelity": 0.95,
+    "coherence": {
+      "t1_s": 50e-6,
+      "t2_s": 20e-6
     }
   },
   "superconducting_google_willow_2024": {
@@ -35,6 +55,24 @@
       "sx": 25e-9,
       "x": 25e-9,
       "cx": 200e-9
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "sx": 25e-9,
+      "x": 25e-9,
+      "cx": 200e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "sx": 0.999,
+      "x": 0.999,
+      "cx": 0.99
+    },
+    "measurement_time_s": 1e-6,
+    "measurement_fidelity": 0.95,
+    "coherence": {
+      "t1_s": 68e-6,
+      "t2_s": 89e-6
     }
   },
   "neutral_atom_aws_2023": {
@@ -90,6 +128,26 @@
       "ry": 2e-6,
       "cz": 6e-6,
       "cx": 6e-6
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "rx": 2e-6,
+      "ry": 2e-6,
+      "cz": 6e-6,
+      "cx": 6e-6
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "rx": 0.995,
+      "ry": 0.995,
+      "cz": 0.98,
+      "cx": 0.98
+    },
+    "measurement_time_s": 10e-6,
+    "measurement_fidelity": 0.95,
+    "coherence": {
+      "t1_s": 1.0,
+      "t2_s": 1.0
     }
   }
 }
