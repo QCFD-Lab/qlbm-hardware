@@ -35,7 +35,7 @@ class QLBMResourceEstimator:
 
         self.directed_coupling = bool(hardware_config.get("directed_coupling", False))
         self.gate_times_s = self._normalize_gate_dict(
-            hardware_config.get("gate_times_s", hardware_config.get("gate_times", {}))
+            hardware_config.get("gate_times_s", {})
         )
         self.gate_fidelities = self._normalize_gate_dict(
             hardware_config.get("gate_fidelities", {})
