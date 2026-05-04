@@ -60,7 +60,10 @@ class QLBMResourceEstimator:
             "hardware": self.hardware_summary(),
             "qlbm": qlbm_metadata or {},
             "logical": logical_metrics,
-            "logical_compatibility": self.check_compatibility(circuit),
+            "logical_compatibility": self.check_compatibility(
+                circuit,
+                include_coupling_violations=False,
+            ),
             "logical_time": self.estimate_time(circuit),
             "logical_fidelity": self.estimate_fidelity(circuit),
             "logical_coherence": self.estimate_coherence(circuit),
@@ -87,7 +90,10 @@ class QLBMResourceEstimator:
                 {
                     "transpiled": transpiled_metrics,
                     "transpiled_circuit": transpiled_qc,
-                    "transpiled_compatibility": self.check_compatibility(transpiled_qc),
+                    "transpiled_compatibility": self.check_compatibility(
+                        transpiled_qc,
+                        include_coupling_violations=True,
+                    ),
                     "transpiled_time": self.estimate_time(transpiled_qc),
                     "transpiled_fidelity": self.estimate_fidelity(transpiled_qc),
                     "transpiled_coherence": self.estimate_coherence(transpiled_qc),
@@ -211,14 +217,18 @@ class QLBMResourceEstimator:
             )
         return violations
 
-    def check_compatibility(self, circuit: QuantumCircuit) -> Dict[str, Any]:
+    def check_compatibility(
+        self,
+        circuit: QuantumCircuit,
+        include_coupling_violations: bool = False,
+    ) -> Dict[str, Any]:
         """Check qubit count, basis gates, and coupling-map compatibility."""
         hardware_qubits = self.hardware_config.get("num_qubits")
         qubit_fit = hardware_qubits is None or circuit.num_qubits <= hardware_qubits
         unsupported = self.unsupported_gates(circuit)
         coupling_violations = self.coupling_violations(circuit)
 
-        return {
+        compatibility = {
             "compatible": qubit_fit and not unsupported and not coupling_violations,
             "qubit_fit": qubit_fit,
             "required_qubits": circuit.num_qubits,
@@ -227,8 +237,11 @@ class QLBMResourceEstimator:
             "unsupported_gates": unsupported,
             "coupling_map_checked": self.coupling_map is not None,
             "coupling_map_ok": not coupling_violations,
-            "coupling_violations": coupling_violations,
         }
+        if include_coupling_violations:
+            compatibility["num_coupling_violations"] = len(coupling_violations)
+            compatibility["coupling_violations"] = coupling_violations
+        return compatibility
 
     def estimate_time(self, circuit: QuantumCircuit) -> Dict[str, Any]:
         """Estimate serial and layer-critical-path circuit duration."""
