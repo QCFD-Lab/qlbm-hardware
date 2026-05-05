@@ -27,7 +27,7 @@ def make_qlbm_circuit() -> QuantumCircuit:
     return qc_abqlbm_4x8_0_obs_q4
 
 if __name__ == "__main__":
-    with open("config.json", "r") as f:
+    with open("../config.json", "r") as f:
         configs = json.load(f)
 
     willow_config = configs["superconducting_google_willow_2024"]

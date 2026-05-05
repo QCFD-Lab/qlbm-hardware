@@ -1,39 +1,14 @@
-"""Small QLBM resource-estimation sweeps using QLBMResourceEstimator."""
+"""QLBM resource-estimation sweeps using QLBMResourceEstimator."""
 
 from __future__ import annotations
-
-import argparse
 import csv
 import json
-import os
-import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
-QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
-
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
-
-for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
-
 from components.resource_estimator import QLBMResourceEstimator
 from qlbm import ABLattice, MSLattice, SpaceTimeLattice
 from qlbm.components import ABQLBM, MSQLBM
 from qlbm.components.spacetime import SpaceTimeQLBM
-
-
-DEFAULT_CONFIG_PATH = (
-    QLBM_HARDWARE_ROOT / "components" / "resource_estimator" / "config.json"
-)
-DEFAULT_OUTPUT_DIR = (
-    QLBM_HARDWARE_ROOT / "qlbm-hardware-output" / "resource-estimates" / "v2"
-)
 
 
 def build_abqlbm_4x4_d2q9():
@@ -91,7 +66,7 @@ def load_hardware_configs(path: Path) -> Dict[str, Dict[str, Any]]:
         return json.load(file)
 
 
-def parse_names(raw_names: List[str], available: Iterable[str]) -> List[str]:
+def select_names(raw_names: List[str], available: Iterable[str]) -> List[str]:
     available_names = list(available)
     if raw_names == ["all"]:
         return available_names
@@ -148,16 +123,24 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
-def run_sweep(args: argparse.Namespace) -> List[Dict[str, Any]]:
-    configs = load_hardware_configs(args.config)
-    hardware_names = parse_names(args.hardware, configs.keys())
-    case_names = parse_names(args.cases, CASE_BUILDERS.keys())
+def run_sweep(
+    config_path: Path,
+    output_dir: Path,
+    case_names: List[str],
+    hardware_names: List[str],
+    optimization_level: int,
+    seed_transpiler: int,
+    transpile_circuit: bool,
+) -> List[Dict[str, Any]]:
+    configs = load_hardware_configs(config_path)
+    selected_hardware = select_names(hardware_names, configs.keys())
+    selected_cases = select_names(case_names, CASE_BUILDERS.keys())
 
     rows = []
-    reports_dir = args.output_dir / "reports"
+    reports_dir = output_dir / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    for case_name in case_names:
+    for case_name in selected_cases:
         case = CASE_BUILDERS[case_name]()
         circuit = case["circuit"]
         metadata = {
@@ -166,15 +149,15 @@ def run_sweep(args: argparse.Namespace) -> List[Dict[str, Any]]:
             "num_timesteps": case.get("num_timesteps"),
         }
 
-        for hardware_name in hardware_names:
+        for hardware_name in selected_hardware:
             estimator = QLBMResourceEstimator(configs[hardware_name])
             report = estimator.estimate(
                 circuit,
                 label=case["label"],
                 qlbm_metadata=metadata,
-                optimization_level=args.optimization_level,
-                seed_transpiler=args.seed_transpiler,
-                transpile_circuit=not args.no_transpile,
+                optimization_level=optimization_level,
+                seed_transpiler=seed_transpiler,
+                transpile_circuit=transpile_circuit,
             )
             row = make_csv_row(report, case)
             rows.append(row)
@@ -195,27 +178,31 @@ def write_csv(rows: List[Dict[str, Any]], path: Path) -> None:
         writer.writerows(rows)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument(
-        "--cases",
-        nargs="+",
-        default=["all"],
-        choices=["all", *CASE_BUILDERS.keys()],
-    )
-    parser.add_argument("--hardware", nargs="+", default=["all"])
-    parser.add_argument("--optimization-level", type=int, default=1)
-    parser.add_argument("--seed-transpiler", type=int, default=42)
-    parser.add_argument("--no-transpile", action="store_true")
-    return parser
-
-
 def main() -> None:
-    args = build_parser().parse_args()
-    rows = run_sweep(args)
-    csv_path = args.output_dir / "qlbm_resource_estimates_v2.csv"
+    project_root = Path(__file__).resolve().parents[3]
+    config_path = project_root / "qlbm-hardware" / "components" / "resource_estimator" / "config.json"
+    output_dir = project_root / "qlbm-hardware" / "qlbm-hardware-output" / "resource-estimates" / "v2"
+
+    # Use ["all"] or choose from: abqlbm_4x4, msqlbm_4x4, spacetime_4x4.
+    case_names = ["all"]
+
+    # Use ["all"] or choose keys from config.json, e.g. ["superconducting_google_willow_2024"].
+    hardware_names = ["all"]
+
+    optimization_level = 1
+    seed_transpiler = 42
+    transpile_circuit = True
+
+    rows = run_sweep(
+        config_path=config_path,
+        output_dir=output_dir,
+        case_names=case_names,
+        hardware_names=hardware_names,
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+        transpile_circuit=transpile_circuit,
+    )
+    csv_path = output_dir / "qlbm_resource_estimates_v2.csv"
     write_csv(rows, csv_path)
     print(f"Wrote {len(rows)} rows to {csv_path}")
 
