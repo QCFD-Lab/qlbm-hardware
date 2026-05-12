@@ -23,7 +23,6 @@ def simple_hardware_config():
         "gate_fidelities": {"h": 0.999, "x": 0.999, "cx": 0.99},
         "measurement_time_s": 1e-6,
         "measurement_fidelity": 0.95,
-        "coherence": {"t1_s": 50e-6, "t2_s": 40e-6},
     }
 
 
@@ -36,9 +35,21 @@ def test_extract_metrics_for_simple_circuit():
 
     assert metrics["num_qubits"] == 2
     assert metrics["active_qubits"] == 2
+    assert metrics["active_qubit_indices"] == [0, 1]
     assert metrics["num_1q_ops"] == 1
     assert metrics["num_2q_ops"] == 1
     assert metrics["num_measure"] == 0
+
+
+def test_active_qubits_ignore_idle_classical_bits_and_barriers():
+    qc = QuantumCircuit(3, 2)
+    qc.h(0)
+    qc.barrier(1, 2)
+
+    metrics = QLBMResourceEstimator(simple_hardware_config()).extract_metrics(qc)
+
+    assert metrics["active_qubits"] == 1
+    assert metrics["active_qubit_indices"] == [0]
 
 
 def test_basis_gate_check_reports_unsupported_gate():
@@ -105,6 +116,74 @@ def test_transpilation_returns_metrics():
     assert estimator.obeys_coupling_map(transpiled)
 
 
+def test_estimate_returns_compacted_simulation_circuit_after_transpilation():
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    qc.cx(0, 1)
+
+    estimator = QLBMResourceEstimator(simple_hardware_config())
+    report = estimator.estimate(qc, optimization_level=1, seed_transpiler=42)
+
+    assert report["transpiled"]["num_qubits"] == 3
+    assert report["transpiled"]["active_qubits"] == 2
+    assert report["transpiled_compatibility"]["coupling_map_ok"] is True
+    assert report["simulation"]["num_qubits"] == 2
+    assert report["simulation"]["active_qubits"] == 2
+    assert report["simulation_circuit"].num_qubits == 2
+
+
+def test_qubit_fit_uses_active_qubits_and_reports_allocated_fit():
+    config = simple_hardware_config()
+    config["num_qubits"] = 2
+    qc = QuantumCircuit(3)
+    qc.h(0)
+    qc.cx(0, 1)
+
+    estimator = QLBMResourceEstimator(config)
+    compatibility = estimator.check_compatibility(qc)
+
+    assert compatibility["required_qubits"] == 2
+    assert compatibility["required_active_qubits"] == 2
+    assert compatibility["allocated_qubits"] == 3
+    assert compatibility["qubit_fit"] is True
+    assert compatibility["active_qubit_fit"] is True
+    assert compatibility["allocated_qubit_fit"] is False
+    assert compatibility["compatible"] is True
+
+
+def test_hardware_validation_reports_topology_mismatch():
+    estimator = QLBMResourceEstimator(
+        {
+            "num_qubits": 2,
+            "basis_gates": ["h", "cx"],
+            "coupling_map": [[0, 1], [1, 2]],
+        }
+    )
+
+    validation = estimator.validate_hardware_config()
+
+    assert validation["topology_num_qubits"] == 3
+    assert validation["topology_matches_num_qubits"] is False
+    assert validation["warnings"]
+
+
+def test_2d_grid_disabled_qubits_match_declared_topology_size():
+    estimator = QLBMResourceEstimator(
+        {
+            "num_qubits": 3,
+            "basis_gates": ["h", "cx"],
+            "coupling_type": "2d_grid",
+            "coupling_params": {"rows": 2, "cols": 2, "disabled_qubits": [3]},
+        }
+    )
+
+    validation = estimator.validate_hardware_config()
+
+    assert validation["topology_num_qubits"] == 3
+    assert validation["topology_matches_num_qubits"] is True
+    assert validation["warnings"] == []
+
+
 def test_time_estimates_serial_and_critical_path():
     qc = QuantumCircuit(2)
     qc.h(0)
@@ -151,11 +230,9 @@ def test_missing_hardware_fields_warn_without_failing():
     estimator = QLBMResourceEstimator({"num_qubits": 1, "basis_gates": ["h"]})
     timing = estimator.estimate_time(qc)
     fidelity = estimator.estimate_fidelity(qc)
-    coherence = estimator.estimate_coherence(qc)
 
     assert timing["unknown_gate_times"] == ["h"]
     assert fidelity["missing_gate_fidelities"] == ["h"]
-    assert "Missing coherence.t1_s" in coherence["warnings"]
 
 
 def test_compose_for_measurement_adds_measurements():

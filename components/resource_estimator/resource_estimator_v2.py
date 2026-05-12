@@ -42,7 +42,6 @@ class QLBMResourceEstimator:
         )
         self.measurement_time_s = hardware_config.get("measurement_time_s")
         self.measurement_fidelity = hardware_config.get("measurement_fidelity")
-        self.coherence = hardware_config.get("coherence", {})
 
     def estimate(
         self,
@@ -66,13 +65,13 @@ class QLBMResourceEstimator:
             ),
             "logical_time": self.estimate_time(circuit),
             "logical_fidelity": self.estimate_fidelity(circuit),
-            "logical_coherence": self.estimate_coherence(circuit),
             "transpiled": None,
             "transpiled_circuit": None,
             "transpiled_compatibility": None,
             "transpiled_time": None,
             "transpiled_fidelity": None,
-            "transpiled_coherence": None,
+            "simulation": None,
+            "simulation_circuit": None,
             "overheads": None,
         }
 
@@ -86,6 +85,7 @@ class QLBMResourceEstimator:
                 seed_transpiler=seed_transpiler,
             )
             transpiled_metrics = self.extract_metrics(transpiled_qc)
+            simulation_qc = self._remove_idle_qubits(transpiled_qc)
             report.update(
                 {
                     "transpiled": transpiled_metrics,
@@ -96,7 +96,8 @@ class QLBMResourceEstimator:
                     ),
                     "transpiled_time": self.estimate_time(transpiled_qc),
                     "transpiled_fidelity": self.estimate_fidelity(transpiled_qc),
-                    "transpiled_coherence": self.estimate_coherence(transpiled_qc),
+                    "simulation": self.extract_metrics(simulation_qc),
+                    "simulation_circuit": simulation_qc,
                     "overheads": self._calculate_overheads(
                         logical_metrics, transpiled_metrics
                     ),
@@ -116,16 +117,13 @@ class QLBMResourceEstimator:
         """Transpile a circuit for this estimator's hardware config."""
         coupling = CouplingMap(self.coupling_map) if self.coupling_map else None
         basis = self.basis_gates or None
-        transpiled_qc = transpile(
+        return transpile(
             circuit,
             basis_gates=basis,
             coupling_map=coupling,
             optimization_level=optimization_level,
             seed_transpiler=seed_transpiler,
         )
-        if self.remove_idle_qubits:
-            return self._remove_idle_qubits(transpiled_qc)
-        return transpiled_qc
 
     def extract_metrics(self, circuit: QuantumCircuit) -> Dict[str, Any]:
         """Extract circuit resource metrics without changing the circuit."""
@@ -160,6 +158,7 @@ class QLBMResourceEstimator:
         return {
             "num_qubits": circuit.num_qubits,
             "active_qubits": self._count_active_qubits(circuit),
+            "active_qubit_indices": self._active_qubit_indices(circuit),
             "num_clbits": circuit.num_clbits,
             "depth": circuit.depth(),
             "size": circuit.size(),
@@ -224,14 +223,22 @@ class QLBMResourceEstimator:
     ) -> Dict[str, Any]:
         """Check qubit count, basis gates, and coupling-map compatibility."""
         hardware_qubits = self.hardware_config.get("num_qubits")
-        qubit_fit = hardware_qubits is None or circuit.num_qubits <= hardware_qubits
+        active_qubits = self._count_active_qubits(circuit)
+        qubit_fit = hardware_qubits is None or active_qubits <= hardware_qubits
+        allocated_qubit_fit = (
+            hardware_qubits is None or circuit.num_qubits <= hardware_qubits
+        )
         unsupported = self.unsupported_gates(circuit)
         coupling_violations = self.coupling_violations(circuit)
 
         compatibility = {
             "compatible": qubit_fit and not unsupported and not coupling_violations,
             "qubit_fit": qubit_fit,
-            "required_qubits": circuit.num_qubits,
+            "active_qubit_fit": qubit_fit,
+            "allocated_qubit_fit": allocated_qubit_fit,
+            "required_qubits": active_qubits,
+            "required_active_qubits": active_qubits,
+            "allocated_qubits": circuit.num_qubits,
             "available_qubits": hardware_qubits,
             "basis_gates_ok": not unsupported,
             "unsupported_gates": unsupported,
@@ -330,33 +337,6 @@ class QLBMResourceEstimator:
             "warnings": warnings,
         }
 
-    def estimate_coherence(self, circuit: QuantumCircuit) -> Dict[str, Any]:
-        """Compare estimated circuit duration to configured T1/T2 coherence times."""
-        time_report = self.estimate_time(circuit)
-        duration_s = time_report["critical_path_time_s"]
-        t1_s = self.coherence.get("t1_s")
-        t2_s = self.coherence.get("t2_s")
-        warnings = []
-
-        t1_ratio = duration_s / t1_s if t1_s else None
-        t2_ratio = duration_s / t2_s if t2_s else None
-        if t1_s is None:
-            warnings.append("Missing coherence.t1_s")
-        if t2_s is None:
-            warnings.append("Missing coherence.t2_s")
-
-        return {
-            "duration_model": "critical_path_time_s",
-            "duration_s": duration_s,
-            "t1_s": t1_s,
-            "t2_s": t2_s,
-            "duration_over_t1": t1_ratio,
-            "duration_over_t2": t2_ratio,
-            "passes_t1": None if t1_ratio is None else t1_ratio < 1.0,
-            "passes_t2": None if t2_ratio is None else t2_ratio < 1.0,
-            "warnings": warnings + time_report["warnings"],
-        }
-
     def compose_for_measurement(
         self, main_circuit: QuantumCircuit, measurement_circuit: QuantumCircuit
     ) -> QuantumCircuit:
@@ -372,16 +352,44 @@ class QLBMResourceEstimator:
 
     def hardware_summary(self) -> Dict[str, Any]:
         """Return a compact hardware summary used in estimate reports."""
+        validation = self.validate_hardware_config()
         return {
             "id": self.hardware_config.get("id"),
             "architecture": self.hardware_config.get("architecture"),
             "device_name": self.hardware_config.get("device_name"),
             "year_reported": self.hardware_config.get("year_reported"),
             "num_qubits": self.hardware_config.get("num_qubits"),
+            "topology_num_qubits": validation["topology_num_qubits"],
             "basis_gates": self.basis_gates,
             "coupling_type": self.coupling_type,
             "num_couplings": len(self.coupling_map or []),
             "directed_coupling": self.directed_coupling,
+            "validation_warnings": validation["warnings"],
+        }
+
+    def validate_hardware_config(self) -> Dict[str, Any]:
+        """Validate consistency between declared qubits and topology qubits."""
+        hardware_qubits = self.hardware_config.get("num_qubits")
+        topology_num_qubits = self._topology_num_qubits()
+        warnings = []
+        if (
+            hardware_qubits is not None
+            and topology_num_qubits is not None
+            and topology_num_qubits != hardware_qubits
+        ):
+            warnings.append(
+                "Topology qubit count "
+                f"({topology_num_qubits}) differs from hardware num_qubits "
+                f"({hardware_qubits})"
+            )
+        return {
+            "topology_num_qubits": topology_num_qubits,
+            "topology_matches_num_qubits": (
+                None
+                if hardware_qubits is None or topology_num_qubits is None
+                else topology_num_qubits == hardware_qubits
+            ),
+            "warnings": warnings,
         }
 
     def _critical_path_time(self, circuit: QuantumCircuit) -> Tuple[float, List[str]]:
@@ -427,6 +435,7 @@ class QLBMResourceEstimator:
             return self._make_2d_grid_edges(
                 int(self.coupling_params.get("rows", 0)),
                 int(self.coupling_params.get("cols", 0)),
+                self.coupling_params.get("disabled_qubits", []),
             )
         return None
 
@@ -438,18 +447,32 @@ class QLBMResourceEstimator:
         return edges
 
     @staticmethod
-    def _make_2d_grid_edges(rows: int, cols: int) -> List[List[int]]:
+    def _make_2d_grid_edges(rows: int, cols: int, disabled_qubits: Optional[List[int]] = None) -> List[List[int]]:
         edges = []
+        disabled = set(disabled_qubits or [])
         for row in range(rows):
             for col in range(cols):
                 qubit = row * cols + col
+                if qubit in disabled:
+                    continue
                 if col + 1 < cols:
                     right = row * cols + col + 1
-                    edges.extend([[qubit, right], [right, qubit]])
+                    if right not in disabled:
+                        edges.extend([[qubit, right], [right, qubit]])
                 if row + 1 < rows:
                     down = (row + 1) * cols + col
-                    edges.extend([[qubit, down], [down, qubit]])
+                    if down not in disabled:
+                        edges.extend([[qubit, down], [down, qubit]])
         return edges
+
+    def _topology_num_qubits(self) -> Optional[int]:
+        if not self.coupling_map:
+            return None
+        qubits = set()
+        for q0, q1 in self.coupling_map:
+            qubits.add(int(q0))
+            qubits.add(int(q1))
+        return len(qubits)
 
     @staticmethod
     def _normalize_gate_dict(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -473,14 +496,23 @@ class QLBMResourceEstimator:
         return numerator / denominator
 
     @staticmethod
-    def _count_active_qubits(circuit: QuantumCircuit) -> int:
-        dag = circuit_to_dag(circuit)
-        return circuit.num_qubits - len(list(dag.idle_wires()))
+    def _active_qubit_indices(circuit: QuantumCircuit) -> List[int]:
+        active = set()
+        for inst in circuit.data:
+            if inst.operation.name.lower() == "barrier":
+                continue
+            for qubit in inst.qubits:
+                active.add(circuit.find_bit(qubit).index)
+        return sorted(active)
+
+    @classmethod
+    def _count_active_qubits(cls, circuit: QuantumCircuit) -> int:
+        return len(cls._active_qubit_indices(circuit))
 
     @staticmethod
     def _remove_idle_qubits(circuit: QuantumCircuit) -> QuantumCircuit:
         dag = circuit_to_dag(circuit)
-        idle_qubits = list(dag.idle_wires())
+        idle_qubits = [wire for wire in dag.idle_wires() if wire in circuit.qubits]
         if idle_qubits:
             dag.remove_qubits(*idle_qubits)
         return dag_to_circuit(dag)
