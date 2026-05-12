@@ -259,6 +259,7 @@ class QLBMResourceEstimator:
             warnings.append("Missing measurement_time_s for measured circuit")
 
         scheduled_duration_s = None
+        max_idle_time_s = None
         if unknown_gates:
             warnings.append(
                 "Scheduled duration unavailable because gate durations are missing"
@@ -268,7 +269,7 @@ class QLBMResourceEstimator:
                 "Scheduled duration unavailable because measurement_time_s is missing"
             )
         else:
-            scheduled_duration_s, schedule_warnings = self._scheduled_duration(circuit)
+            scheduled_duration_s,  max_idle_time_s, schedule_warnings = self._scheduled_timing(circuit)
             warnings.extend(schedule_warnings)
 
         critical_path_time_s, critical_unknown = self._critical_path_time(circuit)
@@ -279,6 +280,7 @@ class QLBMResourceEstimator:
         return {
             "timing_model": "qiskit_asap_schedule",
             "scheduled_duration_s": scheduled_duration_s,
+            "max_idle_time_s": max_idle_time_s,
             "serial_time_s": serial_time_s,
             "critical_path_time_s": critical_path_time_s,
             "unknown_gate_times": unknown_gates,
@@ -287,16 +289,17 @@ class QLBMResourceEstimator:
             "warnings": warnings,
         }
 
-    def _scheduled_duration(self, circuit: QuantumCircuit) -> Tuple[Optional[float], List[str]]:
+    def _scheduled_timing(self, circuit: QuantumCircuit) -> Tuple[Optional[float], Optional[float], List[str]]:
         durations = self._instruction_durations()
         try:
             pass_manager = PassManager([ASAPScheduleAnalysis(durations)])
             pass_manager.run(circuit)
         except Exception as exc:
-            return None, [f"Scheduled duration unavailable: {exc!r}"]
+            return None, None, [f"Scheduled duration unavailable: {exc!r}"]
 
         node_start_times = pass_manager.property_set.get("node_start_time", {})
         scheduled_duration_s = 0.0
+        intervals_by_qubit: Dict[int, List[Tuple[float, float]]] = {}
         missing = set()
         for node, start_time_s in node_start_times.items():
             if not hasattr(node, "op"):
@@ -305,14 +308,40 @@ class QLBMResourceEstimator:
             if duration_s is None:
                 missing.add(node.op.name.lower())
                 continue
-            scheduled_duration_s = max(scheduled_duration_s, start_time_s + duration_s)
+            end_time_s = start_time_s + duration_s
+            scheduled_duration_s = max(scheduled_duration_s, end_time_s)
+            for qubit in node.qargs:
+                qubit_index = circuit.find_bit(qubit).index
+                intervals_by_qubit.setdefault(qubit_index, []).append(
+                    (start_time_s, end_time_s)
+                )
 
         if missing:
-            return None, [
+            return None, None, [
                 "Scheduled duration unavailable because durations are missing for: "
                 + ", ".join(sorted(missing))
             ]
-        return scheduled_duration_s, []
+        return scheduled_duration_s, self._max_idle_time(
+            intervals_by_qubit,
+            scheduled_duration_s,
+        ), []
+
+    @staticmethod
+    def _max_idle_time(
+        intervals_by_qubit: Dict[int, List[Tuple[float, float]]],
+        scheduled_duration_s: float,
+    ) -> float:
+        max_idle_time_s = 0.0
+        for intervals in intervals_by_qubit.values():
+            previous_end_s = 0.0
+            for start_time_s, end_time_s in sorted(intervals):
+                max_idle_time_s = max(max_idle_time_s, start_time_s - previous_end_s)
+                previous_end_s = max(previous_end_s, end_time_s)
+            max_idle_time_s = max(
+                max_idle_time_s,
+                scheduled_duration_s - previous_end_s,
+            )
+        return max_idle_time_s
 
     def _instruction_durations(self) -> InstructionDurations:
         duration_entries = [

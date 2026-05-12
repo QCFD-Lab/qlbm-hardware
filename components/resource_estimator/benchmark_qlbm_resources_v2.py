@@ -206,6 +206,7 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
         "basis_gates_ok": compatibility.get("basis_gates_ok"),
         "coupling_map_ok": compatibility.get("coupling_map_ok"),
         "scheduled_duration_s": timing.get("scheduled_duration_s"),
+        "max_idle_time_s": timing.get("max_idle_time_s"),
         "critical_path_time_s": timing.get("critical_path_time_s"),
         "serial_time_s": timing.get("serial_time_s"),
         "total_success_probability": fidelity.get("total_success_probability"),
