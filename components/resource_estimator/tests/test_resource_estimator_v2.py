@@ -181,7 +181,7 @@ def test_2d_grid_disabled_qubits_match_declared_topology_size():
     assert validation["warnings"] == []
 
 
-def test_time_estimates_serial_and_critical_path():
+def test_time_estimates_serial_critical_path_and_scheduled_duration():
     qc = QuantumCircuit(2)
     qc.h(0)
     qc.x(1)
@@ -189,9 +189,25 @@ def test_time_estimates_serial_and_critical_path():
 
     timing = QLBMResourceEstimator(simple_hardware_config()).estimate_time(qc)
 
+    assert timing["timing_model"] == "qiskit_asap_schedule"
     assert timing["serial_time_s"] == pytest.approx(120e-9)
     assert timing["critical_path_time_s"] == pytest.approx(110e-9)
+    assert timing["scheduled_duration_s"] == pytest.approx(110e-9)
     assert timing["warnings"] == []
+
+
+def test_scheduled_duration_models_parallel_final_measurement():
+    qc = QuantumCircuit(2, 2)
+    qc.h(0)
+    qc.x(1)
+    qc.cx(0, 1)
+    qc.measure([0, 1], [0, 1])
+
+    timing = QLBMResourceEstimator(simple_hardware_config()).estimate_time(qc)
+
+    assert timing["serial_time_s"] == pytest.approx(2120e-9)
+    assert timing["critical_path_time_s"] == pytest.approx(1110e-9)
+    assert timing["scheduled_duration_s"] == pytest.approx(1110e-9)
 
 
 def test_measurement_free_circuit_marks_readout_not_applicable():
@@ -216,6 +232,7 @@ def test_measured_circuit_includes_readout_counts_and_fidelity():
 
     assert metrics["num_measure"] == 1
     assert timing["measurement_time_included"] is True
+    assert timing["scheduled_duration_s"] == pytest.approx(1010e-9)
     assert fidelity["readout_applicable"] is True
     assert fidelity["readout_success_probability"] == pytest.approx(0.95)
 
@@ -229,5 +246,10 @@ def test_missing_hardware_fields_warn_without_failing():
     fidelity = estimator.estimate_fidelity(qc)
 
     assert timing["unknown_gate_times"] == ["h"]
+    assert timing["scheduled_duration_s"] is None
+    assert "primary_duration_s" not in timing
+    assert (
+        "Scheduled duration unavailable because gate durations are missing"
+        in timing["warnings"]
+    )
     assert fidelity["missing_gate_fidelities"] == ["h"]
-

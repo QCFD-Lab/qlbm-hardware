@@ -8,7 +8,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from qiskit import QuantumCircuit, transpile
 from qiskit.converters import circuit_to_dag, dag_to_circuit
-from qiskit.transpiler import CouplingMap
+from qiskit.transpiler import CouplingMap, InstructionDurations, PassManager
+from qiskit.transpiler.passes import ASAPScheduleAnalysis
 
 
 NON_UNITARY_OPS = {"measure", "reset", "barrier", "delay"}
@@ -235,7 +236,7 @@ class QLBMResourceEstimator:
         return compatibility
 
     def estimate_time(self, circuit: QuantumCircuit) -> Dict[str, Any]:
-        """Estimate serial and layer-critical-path circuit duration."""
+        """Estimate scheduled wall-clock duration and serial gate-work time."""
         warnings = []
         op_counts = {name.lower(): count for name, count in circuit.count_ops().items()}
         unknown_gates = sorted(
@@ -257,12 +258,27 @@ class QLBMResourceEstimator:
         if op_counts.get("measure", 0) and self.measurement_time_s is None:
             warnings.append("Missing measurement_time_s for measured circuit")
 
+        scheduled_duration_s = None
+        if unknown_gates:
+            warnings.append(
+                "Scheduled duration unavailable because gate durations are missing"
+            )
+        elif op_counts.get("measure", 0) and self.measurement_time_s is None:
+            warnings.append(
+                "Scheduled duration unavailable because measurement_time_s is missing"
+            )
+        else:
+            scheduled_duration_s, schedule_warnings = self._scheduled_duration(circuit)
+            warnings.extend(schedule_warnings)
+
         critical_path_time_s, critical_unknown = self._critical_path_time(circuit)
         for name in critical_unknown:
             if name not in unknown_gates and name not in NON_UNITARY_OPS:
                 warnings.append(f"Missing gate time on critical path for: {name}")
 
         return {
+            "timing_model": "qiskit_asap_schedule",
+            "scheduled_duration_s": scheduled_duration_s,
             "serial_time_s": serial_time_s,
             "critical_path_time_s": critical_path_time_s,
             "unknown_gate_times": unknown_gates,
@@ -270,6 +286,69 @@ class QLBMResourceEstimator:
             and self.measurement_time_s is not None,
             "warnings": warnings,
         }
+
+    def _scheduled_duration(self, circuit: QuantumCircuit) -> Tuple[Optional[float], List[str]]:
+        durations = self._instruction_durations()
+        try:
+            pass_manager = PassManager([ASAPScheduleAnalysis(durations)])
+            pass_manager.run(circuit)
+        except Exception as exc:
+            return None, [f"Scheduled duration unavailable: {exc!r}"]
+
+        node_start_times = pass_manager.property_set.get("node_start_time", {})
+        scheduled_duration_s = 0.0
+        missing = set()
+        for node, start_time_s in node_start_times.items():
+            if not hasattr(node, "op"):
+                continue
+            duration_s = self._node_duration_s(node)
+            if duration_s is None:
+                missing.add(node.op.name.lower())
+                continue
+            scheduled_duration_s = max(scheduled_duration_s, start_time_s + duration_s)
+
+        if missing:
+            return None, [
+                "Scheduled duration unavailable because durations are missing for: "
+                + ", ".join(sorted(missing))
+            ]
+        return scheduled_duration_s, []
+
+    def _instruction_durations(self) -> InstructionDurations:
+        duration_entries = [
+            (name, None, duration_s, "s")
+            for name, duration_s in self.gate_times_s.items()
+        ]
+        if self.measurement_time_s is not None:
+            duration_entries.append(("measure", None, self.measurement_time_s, "s"))
+        duration_entries.append(("reset", None, 0.0, "s"))
+        return InstructionDurations(duration_entries)
+
+    def _node_duration_s(self, node: Any) -> Optional[float]:
+        name = node.op.name.lower()
+        if name == "measure":
+            return self.measurement_time_s
+        if name in {"barrier", "reset"}:
+            return 0.0
+        if name == "delay":
+            return self._delay_duration_s(node.op)
+        return self.gate_times_s.get(name)
+
+    @staticmethod
+    def _delay_duration_s(operation: Any) -> Optional[float]:
+        duration = getattr(operation, "duration", None)
+        unit = getattr(operation, "unit", None)
+        if duration is None:
+            return None
+        if unit == "s":
+            return float(duration)
+        if unit == "ms":
+            return float(duration) * 1e-3
+        if unit == "us":
+            return float(duration) * 1e-6
+        if unit == "ns":
+            return float(duration) * 1e-9
+        return None
 
     def estimate_fidelity(self, circuit: QuantumCircuit) -> Dict[str, Any]:
         """Estimate first-order gate and readout success probability."""
