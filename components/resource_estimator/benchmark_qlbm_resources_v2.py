@@ -3,61 +3,150 @@
 from __future__ import annotations
 import csv
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
+
+from qiskit import QuantumCircuit
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
+QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
+
+os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
+os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
+
+for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
 from components.resource_estimator import QLBMResourceEstimator
 from qlbm import ABLattice, MSLattice, SpaceTimeLattice
-from qlbm.components import ABQLBM, MSQLBM
-from qlbm.components.spacetime import SpaceTimeQLBM
+from qlbm.components import (
+    ABGridMeasurement,
+    ABInitialConditions,
+    ABQLBM,
+    EmptyPrimitive,
+    GridMeasurement,
+    MSInitialConditions,
+    MSQLBM,
+)
+from qlbm.components.spacetime import SpaceTimeGridVelocityMeasurement, SpaceTimeQLBM
+from qlbm.components.spacetime.initial.pointwise import (
+    PointWiseSpaceTimeInitialConditions,
+)
 
 
-def build_abqlbm_4x4_d2q9():
+def _component_circuit(component: Any) -> QuantumCircuit:
+    return component.circuit if hasattr(component, "circuit") else component
+
+
+def build_full_logical_circuit(
+    initial_conditions: Any,
+    algorithm: Any,
+    postprocessing: Any,
+    measurement: Any,
+    num_timesteps: int,
+) -> QuantumCircuit:
+    """Build the measured logical circuit, the entire logical QLBM circuit.."""
+    initial_circuit = _component_circuit(initial_conditions)
+    algorithm_circuit = _component_circuit(algorithm)
+    postprocessing_circuit = _component_circuit(postprocessing)
+    measurement_circuit = _component_circuit(measurement)
+
+    circuit = QuantumCircuit(*(measurement_circuit.qregs + measurement_circuit.cregs))
+    circuit.compose(
+        initial_circuit.copy(),
+        inplace=True,
+        qubits=range(circuit.num_qubits),
+    )
+    for _ in range(num_timesteps):
+        circuit.compose(algorithm_circuit.copy(), inplace=True)
+    circuit.compose(postprocessing_circuit.copy(), inplace=True)
+    circuit.compose(measurement_circuit.copy(), inplace=True)
+    return circuit
+
+
+def build_abqlbm_4x4_d2q9(num_timesteps: int):
     lattice_data = {
         "lattice": {"dim": {"x": 4, "y": 4}, "velocities": "d2q9"},
         "geometry": [],
     }
     lattice = ABLattice(lattice_data)
+    initial_conditions = ABInitialConditions(lattice)
+    algorithm = ABQLBM(lattice)
+    postprocessing = EmptyPrimitive(lattice)
+    measurement = ABGridMeasurement(lattice)
     return {
-        "label": "abqlbm_4x4_d2q9_no_obstacles",
+        "label": f"abqlbm_4x4_d2q9_t{num_timesteps}_no_obstacles",
         "algorithm": "ABQLBM",
         "lattice": lattice_data,
-        "circuit": ABQLBM(lattice).circuit,
+        "num_timesteps": num_timesteps,
+        "circuit": build_full_logical_circuit(
+            initial_conditions,
+            algorithm,
+            postprocessing,
+            measurement,
+            num_timesteps,
+        ),
     }
 
 
-def build_msqlbm_4x4_v4x4():
+def build_msqlbm_4x4_v4x4(num_timesteps: int):
     lattice_data = {
         "lattice": {"dim": {"x": 4, "y": 4}, "velocities": {"x": 4, "y": 4}},
         "geometry": [],
     }
     lattice = MSLattice(lattice_data)
+    initial_conditions = MSInitialConditions(lattice)
+    algorithm = MSQLBM(lattice)
+    postprocessing = EmptyPrimitive(lattice)
+    measurement = GridMeasurement(lattice)
     return {
-        "label": "msqlbm_4x4_v4x4_no_obstacles",
+        "label": f"msqlbm_4x4_v4x4_t{num_timesteps}_no_obstacles",
         "algorithm": "MSQLBM",
         "lattice": lattice_data,
-        "circuit": MSQLBM(lattice).circuit,
+        "num_timesteps": num_timesteps,
+        "circuit": build_full_logical_circuit(
+            initial_conditions,
+            algorithm,
+            postprocessing,
+            measurement,
+            num_timesteps,
+        ),
     }
 
 
-def build_spacetime_4x4_d2q4_t1():
+def build_spacetime_4x4_d2q4(num_timesteps: int):
     lattice_data = {
         "lattice": {"dim": {"x": 4, "y": 4}, "velocities": "D2Q4"},
         "geometry": [],
     }
-    lattice = SpaceTimeLattice(num_timesteps=1, lattice_data=lattice_data)
+    lattice = SpaceTimeLattice(num_timesteps=num_timesteps, lattice_data=lattice_data)
+    initial_conditions = PointWiseSpaceTimeInitialConditions(lattice)
+    algorithm = SpaceTimeQLBM(lattice)
+    postprocessing = EmptyPrimitive(lattice)
+    measurement = SpaceTimeGridVelocityMeasurement(lattice)
     return {
-        "label": "spacetime_4x4_d2q4_t1_no_obstacles",
+        "label": f"spacetime_4x4_d2q4_t{num_timesteps}_no_obstacles",
         "algorithm": "SpaceTimeQLBM",
         "lattice": lattice_data,
-        "num_timesteps": 1,
-        "circuit": SpaceTimeQLBM(lattice).circuit,
+        "num_timesteps": num_timesteps,
+        "circuit": build_full_logical_circuit(
+            initial_conditions,
+            algorithm,
+            postprocessing,
+            measurement,
+            1,
+        ),
     }
 
 
 CASE_BUILDERS = {
     "abqlbm_4x4": build_abqlbm_4x4_d2q9,
     "msqlbm_4x4": build_msqlbm_4x4_v4x4,
-    "spacetime_4x4": build_spacetime_4x4_d2q4_t1,
+    "spacetime_4x4": build_spacetime_4x4_d2q4,
 }
 
 
@@ -89,11 +178,11 @@ def json_safe(value: Any) -> Any:
 def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]:
     logical = report["logical"]
     transpiled = report.get("transpiled") or {}
+    simulation = report.get("simulation") or {}
     overheads = report.get("overheads") or {}
     compatibility = report.get("transpiled_compatibility") or {}
     timing = report.get("transpiled_time") or {}
     fidelity = report.get("transpiled_fidelity") or {}
-    coherence = report.get("transpiled_coherence") or {}
 
     return {
         "case": case["label"],
@@ -104,6 +193,8 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
         "logical_size": logical["size"],
         "logical_2q_ops": logical["num_2q_ops"],
         "transpiled_qubits": transpiled.get("num_qubits"),
+        "transpiled_active_qubits": transpiled.get("active_qubits"),
+        "simulation_qubits": simulation.get("num_qubits"),
         "transpiled_depth": transpiled.get("depth"),
         "transpiled_size": transpiled.get("size"),
         "transpiled_2q_ops": transpiled.get("num_2q_ops"),
@@ -111,14 +202,12 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
         "size_ratio": overheads.get("size_ratio"),
         "two_qubit_gate_ratio": overheads.get("two_qubit_gate_ratio"),
         "compatible": compatibility.get("compatible"),
-        "qubit_fit": compatibility.get("qubit_fit"),
+        "qubit_capacity_ok": compatibility.get("qubit_capacity_ok"),
         "basis_gates_ok": compatibility.get("basis_gates_ok"),
         "coupling_map_ok": compatibility.get("coupling_map_ok"),
         "critical_path_time_s": timing.get("critical_path_time_s"),
         "serial_time_s": timing.get("serial_time_s"),
         "total_success_probability": fidelity.get("total_success_probability"),
-        "duration_over_t1": coherence.get("duration_over_t1"),
-        "duration_over_t2": coherence.get("duration_over_t2"),
         "transpile_error": report.get("transpile_error"),
     }
 
@@ -131,6 +220,7 @@ def run_sweep(
     optimization_level: int,
     seed_transpiler: int,
     transpile_circuit: bool,
+    num_timesteps: int,
 ) -> List[Dict[str, Any]]:
     configs = load_hardware_configs(config_path)
     selected_hardware = select_names(hardware_names, configs.keys())
@@ -141,7 +231,7 @@ def run_sweep(
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     for case_name in selected_cases:
-        case = CASE_BUILDERS[case_name]()
+        case = CASE_BUILDERS[case_name](num_timesteps)
         circuit = case["circuit"]
         metadata = {
             "algorithm": case["algorithm"],
@@ -179,9 +269,8 @@ def write_csv(rows: List[Dict[str, Any]], path: Path) -> None:
 
 
 def main() -> None:
-    project_root = Path(__file__).resolve().parents[3]
-    config_path = project_root / "qlbm-hardware" / "components" / "resource_estimator" / "config.json"
-    output_dir = project_root / "qlbm-hardware" / "qlbm-hardware-output" / "resource-estimates" / "v2"
+    config_path = QLBM_HARDWARE_ROOT / "components" / "resource_estimator" / "config.json"
+    output_dir = QLBM_HARDWARE_ROOT / "qlbm-hardware-output" / "resource-estimates" / "v2"
 
     # Use ["all"] or choose from: abqlbm_4x4, msqlbm_4x4, spacetime_4x4.
     case_names = ["all"]
@@ -192,6 +281,7 @@ def main() -> None:
     optimization_level = 1
     seed_transpiler = 42
     transpile_circuit = True
+    num_timesteps = 1
 
     rows = run_sweep(
         config_path=config_path,
@@ -201,6 +291,7 @@ def main() -> None:
         optimization_level=optimization_level,
         seed_transpiler=seed_transpiler,
         transpile_circuit=transpile_circuit,
+        num_timesteps=num_timesteps,
     )
     csv_path = output_dir / "qlbm_resource_estimates_v2.csv"
     write_csv(rows, csv_path)

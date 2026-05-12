@@ -132,7 +132,7 @@ def test_estimate_returns_compacted_simulation_circuit_after_transpilation():
     assert report["simulation_circuit"].num_qubits == 2
 
 
-def test_qubit_fit_uses_active_qubits_and_reports_allocated_fit():
+def test_compatibility_reports_used_qubit_capacity():
     config = simple_hardware_config()
     config["num_qubits"] = 2
     qc = QuantumCircuit(3)
@@ -142,12 +142,9 @@ def test_qubit_fit_uses_active_qubits_and_reports_allocated_fit():
     estimator = QLBMResourceEstimator(config)
     compatibility = estimator.check_compatibility(qc)
 
-    assert compatibility["required_qubits"] == 2
-    assert compatibility["required_active_qubits"] == 2
-    assert compatibility["allocated_qubits"] == 3
-    assert compatibility["qubit_fit"] is True
-    assert compatibility["active_qubit_fit"] is True
-    assert compatibility["allocated_qubit_fit"] is False
+    assert compatibility["used_qubits"] == 2
+    assert compatibility["available_qubits"] == 2
+    assert compatibility["qubit_capacity_ok"] is True
     assert compatibility["compatible"] is True
 
 
@@ -234,15 +231,3 @@ def test_missing_hardware_fields_warn_without_failing():
     assert timing["unknown_gate_times"] == ["h"]
     assert fidelity["missing_gate_fidelities"] == ["h"]
 
-
-def test_compose_for_measurement_adds_measurements():
-    main = QuantumCircuit(1)
-    main.h(0)
-    measurement = QuantumCircuit(1, 1)
-    measurement.measure(0, 0)
-
-    estimator = QLBMResourceEstimator(simple_hardware_config())
-    combined = estimator.compose_for_measurement(main, measurement)
-
-    assert combined.count_ops()["h"] == 1
-    assert combined.count_ops()["measure"] == 1

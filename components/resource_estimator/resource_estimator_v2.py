@@ -17,15 +17,9 @@ NON_UNITARY_OPS = {"measure", "reset", "barrier", "delay"}
 class QLBMResourceEstimator:
     """Resource estimator for Qiskit QLBM circuits on NISQ hardware models."""
 
-    def __init__(
-        self,
-        hardware_config: Dict[str, Any],
-        remove_idle_qubits: bool = False,
-        force_no_coupling: bool = False,
+    def __init__(self, hardware_config: Dict[str, Any], force_no_coupling: bool = False,
     ) -> None:
         self.hardware_config = hardware_config
-        self.remove_idle_qubits = remove_idle_qubits
-
         self.basis_gates = [g.lower() for g in hardware_config.get("basis_gates", [])]
         self.coupling_type = None if force_no_coupling else hardware_config.get("coupling_type")
         self.coupling_params = hardware_config.get("coupling_params", {})
@@ -34,12 +28,8 @@ class QLBMResourceEstimator:
             self.coupling_map = self._generate_coupling_map()
 
         self.directed_coupling = bool(hardware_config.get("directed_coupling", False))
-        self.gate_times_s = self._normalize_gate_dict(
-            hardware_config.get("gate_times_s", {})
-        )
-        self.gate_fidelities = self._normalize_gate_dict(
-            hardware_config.get("gate_fidelities", {})
-        )
+        self.gate_times_s = self._normalize_gate_dict(hardware_config.get("gate_times_s", {}))
+        self.gate_fidelities = self._normalize_gate_dict(hardware_config.get("gate_fidelities", {}))
         self.measurement_time_s = hardware_config.get("measurement_time_s")
         self.measurement_fidelity = hardware_config.get("measurement_fidelity")
 
@@ -221,24 +211,18 @@ class QLBMResourceEstimator:
         circuit: QuantumCircuit,
         include_coupling_violations: bool = False,
     ) -> Dict[str, Any]:
-        """Check qubit count, basis gates, and coupling-map compatibility."""
+        """Check used-qubit capacity, basis gates, and coupling-map compatibility."""
         hardware_qubits = self.hardware_config.get("num_qubits")
-        active_qubits = self._count_active_qubits(circuit)
-        qubit_fit = hardware_qubits is None or active_qubits <= hardware_qubits
-        allocated_qubit_fit = (
-            hardware_qubits is None or circuit.num_qubits <= hardware_qubits
-        )
+        used_qubits = self._count_active_qubits(circuit)
+        qubit_capacity_ok = hardware_qubits is None or used_qubits <= hardware_qubits
         unsupported = self.unsupported_gates(circuit)
         coupling_violations = self.coupling_violations(circuit)
+        compatibility = qubit_capacity_ok and not unsupported and not coupling_violations
 
         compatibility = {
-            "compatible": qubit_fit and not unsupported and not coupling_violations,
-            "qubit_fit": qubit_fit,
-            "active_qubit_fit": qubit_fit,
-            "allocated_qubit_fit": allocated_qubit_fit,
-            "required_qubits": active_qubits,
-            "required_active_qubits": active_qubits,
-            "allocated_qubits": circuit.num_qubits,
+            "compatible": compatibility,
+            "qubit_capacity_ok": qubit_capacity_ok,
+            "used_qubits": used_qubits,
             "available_qubits": hardware_qubits,
             "basis_gates_ok": not unsupported,
             "unsupported_gates": unsupported,
@@ -336,19 +320,6 @@ class QLBMResourceEstimator:
             "missing_gate_fidelities": missing,
             "warnings": warnings,
         }
-
-    def compose_for_measurement(
-        self, main_circuit: QuantumCircuit, measurement_circuit: QuantumCircuit
-    ) -> QuantumCircuit:
-        """Compose a QLBM evolution circuit with a compatible measurement circuit."""
-        circuit = QuantumCircuit(*(measurement_circuit.qregs + measurement_circuit.cregs))
-        circuit.compose(
-            main_circuit,
-            qubits=list(range(main_circuit.num_qubits)),
-            inplace=True,
-        )
-        circuit.compose(measurement_circuit.copy(), inplace=True)
-        return circuit
 
     def hardware_summary(self) -> Dict[str, Any]:
         """Return a compact hardware summary used in estimate reports."""
