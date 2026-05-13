@@ -10,6 +10,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from components.resource_estimator import QLBMResourceEstimator
+from components.resource_estimator.benchmark_qlbm_resources_v2 import (
+    build_full_logical_circuit,
+    build_sectioned_logical_circuit,
+)
 
 
 def simple_hardware_config():
@@ -137,6 +141,139 @@ def test_section_analysis_reports_time_and_two_qubit_bottlenecks():
     ] == pytest.approx(110e-9)
     assert analysis["max_two_qubit_gate_section"]["section"] == "algorithm_step_1"
     assert analysis["max_two_qubit_gate_section"]["num_2q_ops"] == 1
+
+
+def test_sectioned_logical_circuit_matches_full_circuit_for_multiple_timesteps():
+    initial_conditions = QuantumCircuit(2)
+    initial_conditions.h(0)
+
+    algorithm = QuantumCircuit(2)
+    algorithm.cx(0, 1)
+
+    postprocessing = QuantumCircuit(2)
+    postprocessing.x(1)
+
+    measurement = QuantumCircuit(2, 2)
+    measurement.measure([0, 1], [0, 1])
+
+    full_circuit = build_full_logical_circuit(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps=3,
+    )
+    sectioned_circuit, section_names = build_sectioned_logical_circuit(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps=3,
+    )
+
+    full_ops = [inst.operation.name for inst in full_circuit.data]
+    sectioned_ops_without_barriers = [
+        inst.operation.name
+        for inst in sectioned_circuit.data
+        if inst.operation.name != "barrier"
+    ]
+    barrier_labels = [
+        inst.operation.label
+        for inst in sectioned_circuit.data
+        if inst.operation.name == "barrier"
+    ]
+
+    assert full_ops == ["h", "cx", "cx", "cx", "x", "measure", "measure"]
+    assert sectioned_ops_without_barriers == full_ops
+    assert section_names == [
+        "initial_conditions",
+        "algorithm_step_1",
+        "algorithm_step_2",
+        "algorithm_step_3",
+        "postprocessing",
+        "measurement",
+    ]
+    assert barrier_labels == [
+        "section_boundary::initial_conditions",
+        "section_boundary::algorithm_step_1",
+        "section_boundary::algorithm_step_2",
+        "section_boundary::algorithm_step_3",
+        "section_boundary::postprocessing",
+    ]
+
+    analysis = QLBMResourceEstimator(simple_hardware_config()).analyze_sections(
+        sectioned_circuit,
+        section_names,
+        optimization_level=0,
+        seed_transpiler=42,
+    )
+
+    assert [section["section"] for section in analysis["sections"]] == section_names
+    assert [
+        section["num_2q_ops"] for section in analysis["sections"]
+    ] == [0, 1, 1, 1, 0, 0]
+
+
+def test_full_and_sectioned_builders_match_manual_time_loop_composition():
+    initial_conditions = QuantumCircuit(2)
+    initial_conditions.h(0)
+
+    algorithm = QuantumCircuit(2)
+    algorithm.cx(0, 1)
+    algorithm.x(0)
+
+    postprocessing = QuantumCircuit(2)
+    postprocessing.h(1)
+
+    measurement = QuantumCircuit(2, 2)
+    measurement.measure([0, 1], [0, 1])
+
+    num_timesteps = 3
+    manual = QuantumCircuit(*(measurement.qregs + measurement.cregs))
+    manual.compose(
+        initial_conditions.copy(),
+        inplace=True,
+        qubits=range(manual.num_qubits),
+    )
+    for _ in range(num_timesteps):
+        manual.compose(algorithm.copy(), inplace=True)
+    manual.compose(postprocessing.copy(), inplace=True)
+    manual.compose(measurement.copy(), inplace=True)
+
+    full_circuit = build_full_logical_circuit(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps=num_timesteps,
+    )
+    sectioned_circuit, _ = build_sectioned_logical_circuit(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps=num_timesteps,
+    )
+
+    def operation_signature(circuit, skip_barriers=False):
+        signature = []
+        for inst in circuit.data:
+            if skip_barriers and inst.operation.name == "barrier":
+                continue
+            signature.append(
+                (
+                    inst.operation.name,
+                    [circuit.find_bit(qubit).index for qubit in inst.qubits],
+                    [circuit.find_bit(clbit).index for clbit in inst.clbits],
+                )
+            )
+        return signature
+
+    assert operation_signature(full_circuit) == operation_signature(manual)
+    assert operation_signature(
+        sectioned_circuit,
+        skip_barriers=True,
+    ) == operation_signature(manual)
 
 
 def test_logical_capacity_uses_declared_logical_qubits():
