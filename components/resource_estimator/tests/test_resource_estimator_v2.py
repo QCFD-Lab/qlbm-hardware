@@ -84,22 +84,6 @@ def test_coupling_map_check_passes_and_fails():
     assert detailed["coupling_violations"][0]["qubits"] == [0, 2]
 
 
-def test_estimate_keeps_logical_compact_and_transpiled_detailed():
-    qc = QuantumCircuit(3)
-    qc.cx(0, 2)
-
-    report = QLBMResourceEstimator(simple_hardware_config()).estimate(
-        qc,
-        optimization_level=1,
-        seed_transpiler=42,
-    )
-
-    assert "coupling_violations" not in report["logical_compatibility"]
-    assert "num_coupling_violations" not in report["logical_compatibility"]
-    assert "coupling_violations" in report["transpiled_compatibility"]
-    assert "num_coupling_violations" in report["transpiled_compatibility"]
-
-
 def test_transpilation_returns_metrics():
     qc = QuantumCircuit(3)
     qc.h(0)

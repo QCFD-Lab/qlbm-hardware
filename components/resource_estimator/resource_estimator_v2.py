@@ -41,7 +41,7 @@ class QLBMResourceEstimator:
         transpile_circuit: bool = True,
     ) -> Dict[str, Any]:
         """Return logical, transpiled, compatibility, and timing resource data."""
-        logical_metrics = self.extract_metrics(circuit)
+        logical_metrics = self.extract_metrics(circuit, include_active_qubit_indices=False)
         report: Dict[str, Any] = {
             "label": label,
             "hardware": self.hardware_summary(),
@@ -51,7 +51,6 @@ class QLBMResourceEstimator:
                 circuit,
                 include_coupling_violations=False,
             ),
-            "logical_time": self.estimate_time(circuit),
             "transpiled": None,
             "transpiled_circuit": None,
             "transpiled_compatibility": None,
@@ -81,7 +80,7 @@ class QLBMResourceEstimator:
                         include_coupling_violations=True,
                     ),
                     "transpiled_time": self.estimate_time(transpiled_qc),
-                    "simulation": self.extract_metrics(simulation_qc),
+                    "simulation": self.extract_metrics(simulation_qc, include_active_qubit_indices=False),
                     "simulation_circuit": simulation_qc,
                     "overheads": self._calculate_overheads(
                         logical_metrics, transpiled_metrics
@@ -110,7 +109,7 @@ class QLBMResourceEstimator:
             seed_transpiler=seed_transpiler,
         )
 
-    def extract_metrics(self, circuit: QuantumCircuit) -> Dict[str, Any]:
+    def extract_metrics(self, circuit: QuantumCircuit, include_active_qubit_indices: bool = True) -> Dict[str, Any]:
         """Extract circuit resource metrics without changing the circuit."""
         op_counts = {name.lower(): count for name, count in circuit.count_ops().items()}
         arity_counts = Counter()
@@ -140,10 +139,9 @@ class QLBMResourceEstimator:
             arity_counts["2q"] / non_measure_ops if non_measure_ops else 0.0
         )
 
-        return {
+        metrics = {
             "num_qubits": circuit.num_qubits,
             "active_qubits": self._count_active_qubits(circuit),
-            "active_qubit_indices": self._active_qubit_indices(circuit),
             "num_clbits": circuit.num_clbits,
             "depth": circuit.depth(),
             "size": circuit.size(),
@@ -158,6 +156,9 @@ class QLBMResourceEstimator:
             "num_other_ops": arity_counts["other"],
             "two_qubit_fraction": two_qubit_fraction,
         }
+        if include_active_qubit_indices:
+            metrics["active_qubit_indices"] = self._active_qubit_indices(circuit)
+        return metrics
 
     def obeys_basis_gates(self, circuit: QuantumCircuit) -> bool:
         """Return True if all unitary operations are in the configured basis gates."""
