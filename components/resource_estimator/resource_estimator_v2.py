@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from math import prod
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from qiskit import QuantumCircuit, transpile
@@ -30,9 +29,7 @@ class QLBMResourceEstimator:
 
         self.directed_coupling = bool(hardware_config.get("directed_coupling", False))
         self.gate_times_s = self._normalize_gate_dict(hardware_config.get("gate_times_s", {}))
-        self.gate_fidelities = self._normalize_gate_dict(hardware_config.get("gate_fidelities", {}))
         self.measurement_time_s = hardware_config.get("measurement_time_s")
-        self.measurement_fidelity = hardware_config.get("measurement_fidelity")
 
     def estimate(
         self,
@@ -43,7 +40,7 @@ class QLBMResourceEstimator:
         seed_transpiler: Optional[int] = 42,
         transpile_circuit: bool = True,
     ) -> Dict[str, Any]:
-        """Return logical, transpiled, compatibility, timing, and noise-proxy data."""
+        """Return logical, transpiled, compatibility, and timing resource data."""
         logical_metrics = self.extract_metrics(circuit)
         report: Dict[str, Any] = {
             "label": label,
@@ -55,12 +52,10 @@ class QLBMResourceEstimator:
                 include_coupling_violations=False,
             ),
             "logical_time": self.estimate_time(circuit),
-            "logical_fidelity": self.estimate_fidelity(circuit),
             "transpiled": None,
             "transpiled_circuit": None,
             "transpiled_compatibility": None,
             "transpiled_time": None,
-            "transpiled_fidelity": None,
             "simulation": None,
             "simulation_circuit": None,
             "overheads": None,
@@ -86,7 +81,6 @@ class QLBMResourceEstimator:
                         include_coupling_violations=True,
                     ),
                     "transpiled_time": self.estimate_time(transpiled_qc),
-                    "transpiled_fidelity": self.estimate_fidelity(transpiled_qc),
                     "simulation": self.extract_metrics(simulation_qc),
                     "simulation_circuit": simulation_qc,
                     "overheads": self._calculate_overheads(
@@ -378,56 +372,6 @@ class QLBMResourceEstimator:
         if unit == "ns":
             return float(duration) * 1e-9
         return None
-
-    def estimate_fidelity(self, circuit: QuantumCircuit) -> Dict[str, Any]:
-        """Estimate first-order gate and readout success probability."""
-        warnings = []
-        op_counts = {name.lower(): count for name, count in circuit.count_ops().items()}
-        missing = sorted(
-            name
-            for name in op_counts
-            if name not in NON_UNITARY_OPS and name not in self.gate_fidelities
-        )
-        if missing:
-            warnings.append(f"Missing gate fidelities for: {', '.join(missing)}")
-
-        gate_factors = [
-            self.gate_fidelities[name] ** count
-            for name, count in op_counts.items()
-            if name in self.gate_fidelities
-        ]
-        gate_success_probability = prod(gate_factors) if gate_factors else None
-
-        num_measure = op_counts.get("measure", 0)
-        if num_measure == 0:
-            readout_success_probability = None
-            readout_applicable = False
-        elif self.measurement_fidelity is None:
-            readout_success_probability = None
-            readout_applicable = True
-            warnings.append("Missing measurement_fidelity for measured circuit")
-        else:
-            readout_success_probability = self.measurement_fidelity**num_measure
-            readout_applicable = True
-
-        if gate_success_probability is None:
-            total_success_probability = readout_success_probability
-        elif readout_success_probability is None:
-            total_success_probability = gate_success_probability
-        else:
-            total_success_probability = (
-                gate_success_probability * readout_success_probability
-            )
-
-        return {
-            "model": "independent_product_estimate",
-            "gate_success_probability": gate_success_probability,
-            "readout_success_probability": readout_success_probability,
-            "readout_applicable": readout_applicable,
-            "total_success_probability": total_success_probability,
-            "missing_gate_fidelities": missing,
-            "warnings": warnings,
-        }
 
     def hardware_summary(self) -> Dict[str, Any]:
         """Return a compact hardware summary used in estimate reports."""

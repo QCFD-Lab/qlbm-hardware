@@ -20,9 +20,7 @@ def simple_hardware_config():
         "basis_gates": ["h", "x", "cx"],
         "coupling_map": [[0, 1], [1, 0], [1, 2], [2, 1]],
         "gate_times_s": {"h": 10e-9, "x": 10e-9, "cx": 100e-9},
-        "gate_fidelities": {"h": 0.999, "x": 0.999, "cx": 0.99},
         "measurement_time_s": 1e-6,
-        "measurement_fidelity": 0.95,
     }
 
 
@@ -224,17 +222,7 @@ def test_scheduled_timing_reports_max_idle_time_before_and_after_activity():
     assert timing["max_idle_time_s"] == pytest.approx(10e-9)
 
 
-def test_measurement_free_circuit_marks_readout_not_applicable():
-    qc = QuantumCircuit(1)
-    qc.h(0)
-
-    fidelity = QLBMResourceEstimator(simple_hardware_config()).estimate_fidelity(qc)
-
-    assert fidelity["readout_applicable"] is False
-    assert fidelity["readout_success_probability"] is None
-
-
-def test_measured_circuit_includes_readout_counts_and_fidelity():
+def test_measured_circuit_includes_readout_counts_and_timing():
     qc = QuantumCircuit(1, 1)
     qc.h(0)
     qc.measure(0, 0)
@@ -242,14 +230,11 @@ def test_measured_circuit_includes_readout_counts_and_fidelity():
     estimator = QLBMResourceEstimator(simple_hardware_config())
     metrics = estimator.extract_metrics(qc)
     timing = estimator.estimate_time(qc)
-    fidelity = estimator.estimate_fidelity(qc)
 
     assert metrics["num_measure"] == 1
     assert timing["measurement_time_included"] is True
     assert timing["scheduled_duration_s"] == pytest.approx(1010e-9)
     assert timing["max_idle_time_s"] == pytest.approx(0.0)
-    assert fidelity["readout_applicable"] is True
-    assert fidelity["readout_success_probability"] == pytest.approx(0.95)
 
 
 def test_missing_hardware_fields_warn_without_failing():
@@ -258,14 +243,11 @@ def test_missing_hardware_fields_warn_without_failing():
 
     estimator = QLBMResourceEstimator({"num_qubits": 1, "basis_gates": ["h"]})
     timing = estimator.estimate_time(qc)
-    fidelity = estimator.estimate_fidelity(qc)
 
     assert timing["unknown_gate_times"] == ["h"]
     assert timing["scheduled_duration_s"] is None
     assert timing["max_idle_time_s"] is None
-    assert "primary_duration_s" not in timing
     assert (
         "Scheduled duration unavailable because gate durations are missing"
         in timing["warnings"]
     )
-    assert fidelity["missing_gate_fidelities"] == ["h"]

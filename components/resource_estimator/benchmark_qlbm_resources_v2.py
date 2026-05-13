@@ -117,7 +117,7 @@ def build_msqlbm_4x4_v4x4(num_timesteps: int):
         ),
     }
 
-
+# TODO: CHECK FOR CORRECTNESS
 def build_spacetime_4x4_d2q4(num_timesteps: int):
     lattice_data = {
         "lattice": {"dim": {"x": 4, "y": 4}, "velocities": "D2Q4"},
@@ -182,7 +182,6 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
     overheads = report.get("overheads") or {}
     compatibility = report.get("transpiled_compatibility") or {}
     timing = report.get("transpiled_time") or {}
-    fidelity = report.get("transpiled_fidelity") or {}
 
     return {
         "case": case["label"],
@@ -209,7 +208,6 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
         "max_idle_time_s": timing.get("max_idle_time_s"),
         "critical_path_time_s": timing.get("critical_path_time_s"),
         "serial_time_s": timing.get("serial_time_s"),
-        "total_success_probability": fidelity.get("total_success_probability"),
         "transpile_error": report.get("transpile_error"),
     }
 
