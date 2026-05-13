@@ -98,7 +98,7 @@ def test_transpilation_returns_metrics():
     assert estimator.obeys_coupling_map(transpiled)
 
 
-def test_estimate_returns_compacted_simulation_circuit_after_transpilation():
+def test_estimate_returns_compacted_transpiled_circuit_after_transpilation():
     qc = QuantumCircuit(2)
     qc.h(0)
     qc.cx(0, 1)
@@ -109,9 +109,25 @@ def test_estimate_returns_compacted_simulation_circuit_after_transpilation():
     assert report["transpiled"]["num_qubits"] == 3
     assert report["transpiled"]["active_qubits"] == 2
     assert report["transpiled_compatibility"]["coupling_map_ok"] is True
-    assert report["simulation"]["num_qubits"] == 2
-    assert report["simulation"]["active_qubits"] == 2
-    assert report["simulation_circuit"].num_qubits == 2
+    assert report["transpiled_compact"]["num_qubits"] == 2
+    assert report["transpiled_compact"]["active_qubits"] == 2
+    assert report["transpiled_compact_circuit"].num_qubits == 2
+
+
+def test_logical_capacity_uses_declared_logical_qubits():
+    config = simple_hardware_config()
+    config["num_qubits"] = 2
+    qc = QuantumCircuit(3)
+    qc.h(0)
+
+    estimator = QLBMResourceEstimator(config)
+    report = estimator.estimate(qc, transpile_circuit=False)
+
+    assert report["logical_capacity"] == {
+        "logical_qubits": 3,
+        "available_qubits": 2,
+        "qubit_capacity_ok": False,
+    }
 
 
 def test_compatibility_reports_used_qubit_capacity():

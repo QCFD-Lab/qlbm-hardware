@@ -178,7 +178,7 @@ def json_safe(value: Any) -> Any:
 def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]:
     logical = report["logical"]
     transpiled = report.get("transpiled") or {}
-    simulation = report.get("simulation") or {}
+    transpiled_compact = report.get("transpiled_compact") or {}
     overheads = report.get("overheads") or {}
     compatibility = report.get("transpiled_compatibility") or {}
     timing = report.get("transpiled_time") or {}
@@ -193,17 +193,17 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
         "logical_2q_ops": logical["num_2q_ops"],
         "transpiled_qubits": transpiled.get("num_qubits"),
         "transpiled_active_qubits": transpiled.get("active_qubits"),
-        "simulation_qubits": simulation.get("num_qubits"),
+        "transpiled_compact_qubits": transpiled_compact.get("num_qubits"),
         "transpiled_depth": transpiled.get("depth"),
         "transpiled_size": transpiled.get("size"),
         "transpiled_2q_ops": transpiled.get("num_2q_ops"),
         "depth_ratio": overheads.get("depth_ratio"),
         "size_ratio": overheads.get("size_ratio"),
         "two_qubit_gate_ratio": overheads.get("two_qubit_gate_ratio"),
-        "compatible": compatibility.get("compatible"),
-        "qubit_capacity_ok": compatibility.get("qubit_capacity_ok"),
-        "basis_gates_ok": compatibility.get("basis_gates_ok"),
-        "coupling_map_ok": compatibility.get("coupling_map_ok"),
+        "transpiled_compatible": compatibility.get("compatible"),
+        "transpiled_qubit_capacity_ok": compatibility.get("qubit_capacity_ok"),
+        "transpiled_basis_gates_ok": compatibility.get("basis_gates_ok"),
+        "transpiled_coupling_map_ok": compatibility.get("coupling_map_ok"),
         "scheduled_duration_s": timing.get("scheduled_duration_s"),
         "max_idle_time_s": timing.get("max_idle_time_s"),
         "critical_path_time_s": timing.get("critical_path_time_s"),

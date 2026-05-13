@@ -41,22 +41,22 @@ class QLBMResourceEstimator:
         transpile_circuit: bool = True,
     ) -> Dict[str, Any]:
         """Return logical, transpiled, compatibility, and timing resource data."""
-        logical_metrics = self.extract_metrics(circuit, include_active_qubit_indices=False)
+        logical_metrics = self.extract_metrics(circuit,
+            include_active_qubits=False,
+            include_active_qubit_indices=False,
+        )
         report: Dict[str, Any] = {
             "label": label,
             "hardware": self.hardware_summary(),
             "qlbm": qlbm_metadata or {},
             "logical": logical_metrics,
-            "logical_compatibility": self.check_compatibility(
-                circuit,
-                include_coupling_violations=False,
-            ),
+            "logical_capacity": self.check_logical_capacity(circuit),
             "transpiled": None,
             "transpiled_circuit": None,
             "transpiled_compatibility": None,
             "transpiled_time": None,
-            "simulation": None,
-            "simulation_circuit": None,
+            "transpiled_compact": None,
+            "transpiled_compact_circuit": None,
             "overheads": None,
         }
 
@@ -70,7 +70,7 @@ class QLBMResourceEstimator:
                 seed_transpiler=seed_transpiler,
             )
             transpiled_metrics = self.extract_metrics(transpiled_qc)
-            simulation_qc = self._remove_idle_qubits(transpiled_qc)
+            transpiled_compact_qc = self._remove_idle_qubits(transpiled_qc)
             report.update(
                 {
                     "transpiled": transpiled_metrics,
@@ -80,8 +80,11 @@ class QLBMResourceEstimator:
                         include_coupling_violations=True,
                     ),
                     "transpiled_time": self.estimate_time(transpiled_qc),
-                    "simulation": self.extract_metrics(simulation_qc, include_active_qubit_indices=False),
-                    "simulation_circuit": simulation_qc,
+                    "transpiled_compact": self.extract_metrics(
+                        transpiled_compact_qc,
+                        include_active_qubit_indices=False,
+                    ),
+                    "transpiled_compact_circuit": transpiled_compact_qc,
                     "overheads": self._calculate_overheads(
                         logical_metrics, transpiled_metrics
                     ),
@@ -109,7 +112,12 @@ class QLBMResourceEstimator:
             seed_transpiler=seed_transpiler,
         )
 
-    def extract_metrics(self, circuit: QuantumCircuit, include_active_qubit_indices: bool = True) -> Dict[str, Any]:
+    def extract_metrics(
+        self,
+        circuit: QuantumCircuit,
+        include_active_qubits: bool = True,
+        include_active_qubit_indices: bool = True,
+    ) -> Dict[str, Any]:
         """Extract circuit resource metrics without changing the circuit."""
         op_counts = {name.lower(): count for name, count in circuit.count_ops().items()}
         arity_counts = Counter()
@@ -141,7 +149,6 @@ class QLBMResourceEstimator:
 
         metrics = {
             "num_qubits": circuit.num_qubits,
-            "active_qubits": self._count_active_qubits(circuit),
             "num_clbits": circuit.num_clbits,
             "depth": circuit.depth(),
             "size": circuit.size(),
@@ -156,6 +163,8 @@ class QLBMResourceEstimator:
             "num_other_ops": arity_counts["other"],
             "two_qubit_fraction": two_qubit_fraction,
         }
+        if include_active_qubits:
+            metrics["active_qubits"] = self._count_active_qubits(circuit)
         if include_active_qubit_indices:
             metrics["active_qubit_indices"] = self._active_qubit_indices(circuit)
         return metrics
@@ -229,6 +238,18 @@ class QLBMResourceEstimator:
             compatibility["num_coupling_violations"] = len(coupling_violations)
             compatibility["coupling_violations"] = coupling_violations
         return compatibility
+
+    def check_logical_capacity(self, circuit: QuantumCircuit) -> Dict[str, Any]:
+        """Check whether the logical circuit qubit count fits the hardware size."""
+        hardware_qubits = self.hardware_config.get("num_qubits")
+        logical_qubits = circuit.num_qubits
+        return {
+            "logical_qubits": logical_qubits,
+            "available_qubits": hardware_qubits,
+            "qubit_capacity_ok": (
+                hardware_qubits is None or logical_qubits <= hardware_qubits
+            ),
+        }
 
     def estimate_time(self, circuit: QuantumCircuit) -> Dict[str, Any]:
         """Estimate scheduled wall-clock duration and serial gate-work time."""
