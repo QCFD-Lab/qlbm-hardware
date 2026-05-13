@@ -6,7 +6,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
 
 from qiskit import QuantumCircuit
 
@@ -38,8 +38,35 @@ from qlbm.components.spacetime.initial.pointwise import (
 )
 
 
+SECTION_BOUNDARY_PREFIX = "section_boundary::"
+
+
 def _component_circuit(component: Any) -> QuantumCircuit:
     return component.circuit if hasattr(component, "circuit") else component
+
+
+def _logical_sections(
+    initial_conditions: Any,
+    algorithm: Any,
+    postprocessing: Any,
+    measurement: Any,
+    num_timesteps: int,
+) -> List[Tuple[str, QuantumCircuit]]:
+    initial_circuit = _component_circuit(initial_conditions)
+    algorithm_circuit = _component_circuit(algorithm)
+    postprocessing_circuit = _component_circuit(postprocessing)
+    measurement_circuit = _component_circuit(measurement)
+
+    sections = [("initial_conditions", initial_circuit.copy())]
+    for step in range(1, num_timesteps + 1):
+        sections.append((f"algorithm_step_{step}", algorithm_circuit.copy()))
+    sections.extend(
+        [
+            ("postprocessing", postprocessing_circuit.copy()),
+            ("measurement", measurement_circuit.copy()),
+        ]
+    )
+    return sections
 
 
 def build_full_logical_circuit(
@@ -50,22 +77,41 @@ def build_full_logical_circuit(
     num_timesteps: int,
 ) -> QuantumCircuit:
     """Build the measured logical circuit, the entire logical QLBM circuit.."""
-    initial_circuit = _component_circuit(initial_conditions)
-    algorithm_circuit = _component_circuit(algorithm)
-    postprocessing_circuit = _component_circuit(postprocessing)
     measurement_circuit = _component_circuit(measurement)
-
     circuit = QuantumCircuit(*(measurement_circuit.qregs + measurement_circuit.cregs))
-    circuit.compose(
-        initial_circuit.copy(),
-        inplace=True,
-        qubits=range(circuit.num_qubits),
-    )
-    for _ in range(num_timesteps):
-        circuit.compose(algorithm_circuit.copy(), inplace=True)
-    circuit.compose(postprocessing_circuit.copy(), inplace=True)
-    circuit.compose(measurement_circuit.copy(), inplace=True)
+    for _, section_circuit in _logical_sections(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps,
+    ):
+        circuit.compose(section_circuit, inplace=True, qubits=range(circuit.num_qubits))
     return circuit
+
+
+def build_sectioned_logical_circuit(
+    initial_conditions: Any,
+    algorithm: Any,
+    postprocessing: Any,
+    measurement: Any,
+    num_timesteps: int,
+) -> Tuple[QuantumCircuit, List[str]]:
+    """Build a diagnostic logical circuit with labeled barriers between sections."""
+    measurement_circuit = _component_circuit(measurement)
+    circuit = QuantumCircuit(*(measurement_circuit.qregs + measurement_circuit.cregs))
+    sections = _logical_sections(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps,
+    )
+    for index, (section_name, section_circuit) in enumerate(sections):
+        circuit.compose(section_circuit, inplace=True, qubits=range(circuit.num_qubits))
+        if index < len(sections) - 1:
+            circuit.barrier(label=f"{SECTION_BOUNDARY_PREFIX}{section_name}")
+    return circuit, [name for name, _ in sections]
 
 
 def build_abqlbm_4x4_d2q9(num_timesteps: int):
@@ -78,6 +124,13 @@ def build_abqlbm_4x4_d2q9(num_timesteps: int):
     algorithm = ABQLBM(lattice)
     postprocessing = EmptyPrimitive(lattice)
     measurement = ABGridMeasurement(lattice)
+    sectioned_circuit, section_names = build_sectioned_logical_circuit(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps,
+    )
     return {
         "label": f"abqlbm_4x4_d2q9_t{num_timesteps}_no_obstacles",
         "algorithm": "ABQLBM",
@@ -90,6 +143,8 @@ def build_abqlbm_4x4_d2q9(num_timesteps: int):
             measurement,
             num_timesteps,
         ),
+        "sectioned_circuit": sectioned_circuit,
+        "section_names": section_names,
     }
 
 
@@ -103,6 +158,13 @@ def build_msqlbm_4x4_v4x4(num_timesteps: int):
     algorithm = MSQLBM(lattice)
     postprocessing = EmptyPrimitive(lattice)
     measurement = GridMeasurement(lattice)
+    sectioned_circuit, section_names = build_sectioned_logical_circuit(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        num_timesteps,
+    )
     return {
         "label": f"msqlbm_4x4_v4x4_t{num_timesteps}_no_obstacles",
         "algorithm": "MSQLBM",
@@ -115,6 +177,8 @@ def build_msqlbm_4x4_v4x4(num_timesteps: int):
             measurement,
             num_timesteps,
         ),
+        "sectioned_circuit": sectioned_circuit,
+        "section_names": section_names,
     }
 
 # TODO: CHECK FOR CORRECTNESS
@@ -128,6 +192,13 @@ def build_spacetime_4x4_d2q4(num_timesteps: int):
     algorithm = SpaceTimeQLBM(lattice)
     postprocessing = EmptyPrimitive(lattice)
     measurement = SpaceTimeGridVelocityMeasurement(lattice)
+    sectioned_circuit, section_names = build_sectioned_logical_circuit(
+        initial_conditions,
+        algorithm,
+        postprocessing,
+        measurement,
+        1,
+    )
     return {
         "label": f"spacetime_4x4_d2q4_t{num_timesteps}_no_obstacles",
         "algorithm": "SpaceTimeQLBM",
@@ -140,6 +211,8 @@ def build_spacetime_4x4_d2q4(num_timesteps: int):
             measurement,
             1,
         ),
+        "sectioned_circuit": sectioned_circuit,
+        "section_names": section_names,
     }
 
 
@@ -182,6 +255,9 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
     overheads = report.get("overheads") or {}
     compatibility = report.get("transpiled_compatibility") or {}
     timing = report.get("transpiled_time") or {}
+    section_analysis = report.get("section_analysis") or {}
+    max_time_section = section_analysis.get("max_critical_path_time_section") or {}
+    max_2q_section = section_analysis.get("max_two_qubit_gate_section") or {}
 
     return {
         "case": case["label"],
@@ -208,6 +284,10 @@ def make_csv_row(report: Dict[str, Any], case: Dict[str, Any]) -> Dict[str, Any]
         "max_idle_time_s": timing.get("max_idle_time_s"),
         "critical_path_time_s": timing.get("critical_path_time_s"),
         "serial_time_s": timing.get("serial_time_s"),
+        "max_time_section": max_time_section.get("section"),
+        "max_time_section_critical_path_s": max_time_section.get("critical_path_time_s"),
+        "max_2q_section": max_2q_section.get("section"),
+        "max_2q_section_count": max_2q_section.get("num_2q_ops"),
         "transpile_error": report.get("transpile_error"),
     }
 
@@ -245,6 +325,8 @@ def run_sweep(
                 circuit,
                 label=case["label"],
                 qlbm_metadata=metadata,
+                sectioned_circuit=case.get("sectioned_circuit"),
+                section_names=case.get("section_names"),
                 optimization_level=optimization_level,
                 seed_transpiler=seed_transpiler,
                 transpile_circuit=transpile_circuit,

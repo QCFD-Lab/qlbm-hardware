@@ -12,6 +12,7 @@ from qiskit.transpiler.passes import ASAPScheduleAnalysis
 
 
 NON_UNITARY_OPS = {"measure", "reset", "barrier", "delay"}
+SECTION_BOUNDARY_PREFIX = "section_boundary::"
 
 
 class QLBMResourceEstimator:
@@ -36,6 +37,8 @@ class QLBMResourceEstimator:
         circuit: QuantumCircuit,
         label: Optional[str] = None,
         qlbm_metadata: Optional[Dict[str, Any]] = None,
+        sectioned_circuit: Optional[QuantumCircuit] = None,
+        section_names: Optional[List[str]] = None,
         optimization_level: int = 1,
         seed_transpiler: Optional[int] = 42,
         transpile_circuit: bool = True,
@@ -57,6 +60,7 @@ class QLBMResourceEstimator:
             "transpiled_time": None,
             "transpiled_compact": None,
             "transpiled_compact_circuit": None,
+            "section_analysis": None,
             "overheads": None,
         }
 
@@ -90,6 +94,16 @@ class QLBMResourceEstimator:
                     ),
                 }
             )
+            if sectioned_circuit is not None and section_names:
+                try:
+                    report["section_analysis"] = self.analyze_sections(
+                        sectioned_circuit,
+                        section_names,
+                        optimization_level=optimization_level,
+                        seed_transpiler=seed_transpiler,
+                    )
+                except Exception as section_exc:
+                    report["section_analysis_error"] = repr(section_exc)
         except Exception as exc:
             report["transpile_error"] = repr(exc)
 
@@ -111,6 +125,34 @@ class QLBMResourceEstimator:
             optimization_level=optimization_level,
             seed_transpiler=seed_transpiler,
         )
+
+    def analyze_sections(
+        self,
+        sectioned_circuit: QuantumCircuit,
+        section_names: List[str],
+        optimization_level: int = 1,
+        seed_transpiler: Optional[int] = 42,
+    ) -> Dict[str, Any]:
+        """Attribute transpiled resource metrics to labeled top-level sections."""
+        transpiled = self.transpile_circuit(
+            sectioned_circuit,
+            optimization_level=optimization_level,
+            seed_transpiler=seed_transpiler,
+        )
+        section_circuits = self._split_by_section_boundaries(transpiled, section_names)
+        sections = [self._section_metrics(name, circuit) for name, circuit in section_circuits]
+
+        return {
+            "sections": sections,
+            "max_critical_path_time_section": self._max_section(
+                sections,
+                "critical_path_time_s",
+            ),
+            "max_two_qubit_gate_section": self._max_section(
+                sections,
+                "num_2q_ops",
+            ),
+        }
 
     def extract_metrics(
         self,
@@ -263,13 +305,7 @@ class QLBMResourceEstimator:
         if unknown_gates:
             warnings.append(f"Missing gate times for: {', '.join(unknown_gates)}")
 
-        serial_time_s = 0.0
-        for name, count in op_counts.items():
-            gate_name = name.lower()
-            if gate_name == "measure":
-                serial_time_s += count * (self.measurement_time_s or 0.0)
-            else:
-                serial_time_s += count * self.gate_times_s.get(gate_name, 0.0)
+        serial_time_s = self._serial_time(circuit)
 
         if op_counts.get("measure", 0) and self.measurement_time_s is None:
             warnings.append("Missing measurement_time_s for measured circuit")
@@ -304,6 +340,70 @@ class QLBMResourceEstimator:
             and self.measurement_time_s is not None,
             "warnings": warnings,
         }
+
+    def _section_metrics(self, section_name: str, circuit: QuantumCircuit) -> Dict[str, Any]:
+        metrics = self.extract_metrics(
+            circuit,
+            include_active_qubits=False,
+            include_active_qubit_indices=False,
+        )
+        critical_path_time_s, _ = self._critical_path_time(circuit)
+        return {
+            "section": section_name,
+            "num_1q_ops": metrics["num_1q_ops"],
+            "num_2q_ops": metrics["num_2q_ops"],
+            "depth": metrics["depth"],
+            "size": metrics["size"],
+            "critical_path_time_s": critical_path_time_s,
+            "serial_time_s": self._serial_time(circuit),
+            "op_counts": metrics["op_counts"],
+        }
+
+    def _split_by_section_boundaries(
+        self,
+        circuit: QuantumCircuit,
+        section_names: List[str],
+    ) -> List[Tuple[str, QuantumCircuit]]:
+        section_circuits = [
+            QuantumCircuit(*(circuit.qregs + circuit.cregs)) for _ in section_names
+        ]
+        section_index = 0
+        for inst in circuit.data:
+            if self._is_section_boundary(inst.operation):
+                section_index += 1
+                continue
+            if section_index >= len(section_circuits):
+                continue
+            section_circuits[section_index].append(
+                inst.operation.copy(),
+                inst.qubits,
+                inst.clbits,
+            )
+        return list(zip(section_names, section_circuits))
+
+    @staticmethod
+    def _is_section_boundary(operation: Any) -> bool:
+        return (
+            operation.name.lower() == "barrier"
+            and isinstance(operation.label, str)
+            and operation.label.startswith(SECTION_BOUNDARY_PREFIX)
+        )
+
+    @staticmethod
+    def _max_section(sections: List[Dict[str, Any]], metric_name: str) -> Optional[Dict[str, Any]]:
+        if not sections:
+            return None
+        return max(sections, key=lambda section: section[metric_name])
+
+    def _serial_time(self, circuit: QuantumCircuit) -> float:
+        serial_time_s = 0.0
+        for name, count in circuit.count_ops().items():
+            gate_name = name.lower()
+            if gate_name == "measure":
+                serial_time_s += count * (self.measurement_time_s or 0.0)
+            else:
+                serial_time_s += count * self.gate_times_s.get(gate_name, 0.0)
+        return serial_time_s
 
     def _scheduled_timing(self, circuit: QuantumCircuit) -> Tuple[Optional[float], Optional[float], List[str]]:
         durations = self._instruction_durations()

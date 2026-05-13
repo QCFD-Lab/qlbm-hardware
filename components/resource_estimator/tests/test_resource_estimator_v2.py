@@ -114,6 +114,31 @@ def test_estimate_returns_compacted_transpiled_circuit_after_transpilation():
     assert report["transpiled_compact_circuit"].num_qubits == 2
 
 
+def test_section_analysis_reports_time_and_two_qubit_bottlenecks():
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    qc.barrier(label="section_boundary::initial_conditions")
+    qc.cx(0, 1)
+    qc.x(0)
+    qc.barrier(label="section_boundary::algorithm_step_1")
+    qc.h(1)
+
+    analysis = QLBMResourceEstimator(simple_hardware_config()).analyze_sections(
+        qc,
+        ["initial_conditions", "algorithm_step_1", "measurement"],
+        optimization_level=0,
+        seed_transpiler=42,
+    )
+
+    assert len(analysis["sections"]) == 3
+    assert analysis["max_critical_path_time_section"]["section"] == "algorithm_step_1"
+    assert analysis["max_critical_path_time_section"][
+        "critical_path_time_s"
+    ] == pytest.approx(110e-9)
+    assert analysis["max_two_qubit_gate_section"]["section"] == "algorithm_step_1"
+    assert analysis["max_two_qubit_gate_section"]["num_2q_ops"] == 1
+
+
 def test_logical_capacity_uses_declared_logical_qubits():
     config = simple_hardware_config()
     config["num_qubits"] = 2
