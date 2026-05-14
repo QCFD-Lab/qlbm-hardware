@@ -10,6 +10,10 @@ from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.transpiler import CouplingMap, InstructionDurations, PassManager
 from qiskit.transpiler.passes import ASAPScheduleAnalysis
 
+from components.phase_poly_optimizer.architecture_aware_phasepoly_optimizer import (
+    find_phase_polynomial_blocks,
+)
+
 
 NON_UNITARY_OPS = {"measure", "reset", "barrier", "delay"}
 SECTION_BOUNDARY_PREFIX = "section_boundary::"
@@ -42,6 +46,7 @@ class QLBMResourceEstimator:
         optimization_level: int = 1,
         seed_transpiler: Optional[int] = 42,
         transpile_circuit: bool = True,
+        phase_polynomial_analysis: bool = False,
     ) -> Dict[str, Any]:
         """Return logical, transpiled, compatibility, and timing resource data."""
         logical_metrics = self.extract_metrics(circuit,
@@ -94,6 +99,10 @@ class QLBMResourceEstimator:
                     ),
                 }
             )
+            if phase_polynomial_analysis:
+                report["phase_polynomial_analysis"] = (
+                    self.analyze_phase_polynomial_blocks(transpiled_qc)
+                )
             if sectioned_circuit is not None and section_names:
                 try:
                     report["section_analysis"] = self.analyze_sections(
@@ -115,6 +124,7 @@ class QLBMResourceEstimator:
         label: Optional[str] = None,
         qlbm_metadata: Optional[Dict[str, Any]] = None,
         logical_metrics: Optional[Dict[str, Any]] = None,
+        phase_polynomial_analysis: bool = False,
     ) -> Dict[str, Any]:
         """
         Return resource data for a circuit that has already been transpiled.
@@ -147,6 +157,10 @@ class QLBMResourceEstimator:
             if logical_metrics is not None
             else None,
         }
+        if phase_polynomial_analysis:
+            report["phase_polynomial_analysis"] = (
+                self.analyze_phase_polynomial_blocks(circuit)
+            )
         return report
 
     def compact_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
@@ -196,6 +210,54 @@ class QLBMResourceEstimator:
                 sections,
                 "num_2q_ops",
             ),
+        }
+
+    def analyze_phase_polynomial_blocks(self, circuit: QuantumCircuit) -> Dict[str, Any]:
+        """Summarize contiguous phase-polynomial blocks in a physical circuit."""
+        block_summaries = [
+            self._phase_polynomial_block_summary(circuit, block)
+            for block in find_phase_polynomial_blocks(circuit, allow_barriers=True)
+        ]
+        block_summaries = [summary for summary in block_summaries if summary is not None]
+
+        num_blocks = len(block_summaries)
+        total_block_instructions = sum(
+            block["instruction_count"] for block in block_summaries
+        )
+        total_phase_instructions = sum(
+            block["phase_instruction_count"] for block in block_summaries
+        )
+        total_passthrough_instructions = sum(
+            block["passthrough_instruction_count"] for block in block_summaries
+        )
+        total_rz = sum(block["rz_count"] for block in block_summaries)
+        total_cx = sum(block["cx_count"] for block in block_summaries)
+        total_active_qubits = sum(
+            block["active_qubit_count"] for block in block_summaries
+        )
+        largest_block = (
+            max(block_summaries, key=lambda block: block["instruction_count"])
+            if block_summaries
+            else None
+        )
+
+        return {
+            "num_blocks": num_blocks,
+            "total_block_instructions": total_block_instructions,
+            "total_phase_instructions": total_phase_instructions,
+            "total_passthrough_instructions": total_passthrough_instructions,
+            "total_rz": total_rz,
+            "total_cx": total_cx,
+            "average_block_instructions": self._safe_average(
+                total_block_instructions, num_blocks
+            ),
+            "average_phase_instructions": self._safe_average(
+                total_phase_instructions, num_blocks
+            ),
+            "average_active_qubits": self._safe_average(
+                total_active_qubits, num_blocks
+            ),
+            "largest_block": largest_block,
         }
 
     def extract_metrics(
@@ -683,6 +745,36 @@ class QLBMResourceEstimator:
         if denominator == 0:
             return None
         return numerator / denominator
+
+    @staticmethod
+    def _safe_average(total: float, count: int) -> float:
+        return total / count if count else 0.0
+
+    @staticmethod
+    def _phase_polynomial_block_summary(
+        circuit: QuantumCircuit,
+        block: Any,
+    ) -> Optional[Dict[str, Any]]:
+        operation_names = [
+            circuit.data[index].operation.name.lower()
+            for index in block.phase_instruction_indices
+        ]
+        rz_count = operation_names.count("rz")
+        cx_count = operation_names.count("cx")
+        if rz_count + cx_count == 0:
+            return None
+
+        return {
+            "start": block.start,
+            "end": block.end,
+            "instruction_count": block.end - block.start + 1,
+            "phase_instruction_count": len(block.phase_instruction_indices),
+            "passthrough_instruction_count": len(block.passthrough_instruction_indices),
+            "active_qubits": list(block.active_qubits),
+            "active_qubit_count": len(block.active_qubits),
+            "rz_count": rz_count,
+            "cx_count": cx_count,
+        }
 
     @staticmethod
     def _active_qubit_indices(circuit: QuantumCircuit) -> List[int]:

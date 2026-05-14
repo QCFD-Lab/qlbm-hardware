@@ -116,6 +116,7 @@ def test_estimate_returns_compacted_transpiled_circuit_after_transpilation():
     assert report["transpiled_compact"]["num_qubits"] == 2
     assert report["transpiled_compact"]["active_qubits"] == 2
     assert report["transpiled_compact_circuit"].num_qubits == 2
+    assert "phase_polynomial_analysis" not in report
 
 
 def test_estimate_pretranspiled_reports_without_retranspiling(monkeypatch):
@@ -134,6 +135,7 @@ def test_estimate_pretranspiled_reports_without_retranspiling(monkeypatch):
         qc,
         label="already_physical",
         logical_metrics={"depth": 1, "size": 1, "num_2q_ops": 1},
+        phase_polynomial_analysis=True,
     )
 
     assert report["label"] == "already_physical"
@@ -147,6 +149,88 @@ def test_estimate_pretranspiled_reports_without_retranspiling(monkeypatch):
     assert report["transpiled_compact"]["active_qubits"] == 2
     assert report["transpiled_compact_circuit"].num_qubits == 2
     assert report["overheads"]["added_two_qubit_gates"] == 0
+    assert report["phase_polynomial_analysis"]["num_blocks"] == 1
+
+
+def test_estimate_pretranspiled_omits_phase_polynomial_analysis_by_default():
+    qc = QuantumCircuit(2)
+    qc.cx(0, 1)
+
+    report = QLBMResourceEstimator(simple_hardware_config()).estimate_pretranspiled(qc)
+
+    assert "phase_polynomial_analysis" not in report
+
+
+def test_phase_polynomial_analysis_reports_summary_and_largest_block():
+    qc = QuantumCircuit(4)
+    qc.h(0)
+    qc.cx(0, 1)
+    qc.rz(0.1, 1)
+    qc.h(3)
+    qc.cx(2, 3)
+    qc.x(0)
+    qc.rz(0.2, 3)
+    qc.cx(2, 3)
+    qc.h(1)
+
+    analysis = QLBMResourceEstimator(simple_hardware_config()).analyze_phase_polynomial_blocks(qc)
+
+    assert analysis["num_blocks"] == 2
+    assert analysis["total_block_instructions"] == 6
+    assert analysis["total_phase_instructions"] == 5
+    assert analysis["total_passthrough_instructions"] == 1
+    assert analysis["total_rz"] == 2
+    assert analysis["total_cx"] == 3
+    assert analysis["average_block_instructions"] == pytest.approx(3.0)
+    assert analysis["average_phase_instructions"] == pytest.approx(2.5)
+    assert analysis["average_active_qubits"] == pytest.approx(2.0)
+    assert analysis["largest_block"] == {
+        "start": 4,
+        "end": 7,
+        "instruction_count": 4,
+        "phase_instruction_count": 3,
+        "passthrough_instruction_count": 1,
+        "active_qubits": [2, 3],
+        "active_qubit_count": 2,
+        "rz_count": 1,
+        "cx_count": 2,
+    }
+
+
+def test_phase_polynomial_analysis_ignores_circuits_without_cx_or_rz_blocks():
+    qc = QuantumCircuit(2)
+    qc.h(0)
+    qc.barrier()
+    qc.x(1)
+
+    analysis = QLBMResourceEstimator(simple_hardware_config()).analyze_phase_polynomial_blocks(qc)
+
+    assert analysis == {
+        "num_blocks": 0,
+        "total_block_instructions": 0,
+        "total_phase_instructions": 0,
+        "total_passthrough_instructions": 0,
+        "total_rz": 0,
+        "total_cx": 0,
+        "average_block_instructions": 0.0,
+        "average_phase_instructions": 0.0,
+        "average_active_qubits": 0.0,
+        "largest_block": None,
+    }
+
+
+def test_estimate_includes_phase_polynomial_analysis_when_enabled():
+    qc = QuantumCircuit(2)
+    qc.cx(0, 1)
+
+    report = QLBMResourceEstimator(simple_hardware_config()).estimate(
+        qc,
+        optimization_level=0,
+        seed_transpiler=42,
+        phase_polynomial_analysis=True,
+    )
+
+    assert report["phase_polynomial_analysis"]["num_blocks"] >= 1
 
 
 def test_section_analysis_reports_time_and_two_qubit_bottlenecks():
