@@ -118,6 +118,37 @@ def test_estimate_returns_compacted_transpiled_circuit_after_transpilation():
     assert report["transpiled_compact_circuit"].num_qubits == 2
 
 
+def test_estimate_pretranspiled_reports_without_retranspiling(monkeypatch):
+    qc = QuantumCircuit(3, 2)
+    qc.h(0)
+    qc.cx(0, 1)
+    qc.measure([0, 1], [0, 1])
+
+    estimator = QLBMResourceEstimator(simple_hardware_config())
+
+    def fail_transpile(*args, **kwargs):
+        raise AssertionError("estimate_pretranspiled must not transpile")
+
+    monkeypatch.setattr(estimator, "transpile_circuit", fail_transpile)
+    report = estimator.estimate_pretranspiled(
+        qc,
+        label="already_physical",
+        logical_metrics={"depth": 1, "size": 1, "num_2q_ops": 1},
+    )
+
+    assert report["label"] == "already_physical"
+    assert report["transpiled_circuit"] is qc
+    assert report["transpiled"]["num_qubits"] == 3
+    assert report["transpiled"]["active_qubits"] == 2
+    assert report["transpiled_compatibility"]["compatible"] is True
+    assert report["transpiled_compatibility"]["coupling_map_ok"] is True
+    assert report["transpiled_compatibility"]["num_coupling_violations"] == 0
+    assert report["transpiled_compact"]["num_qubits"] == 2
+    assert report["transpiled_compact"]["active_qubits"] == 2
+    assert report["transpiled_compact_circuit"].num_qubits == 2
+    assert report["overheads"]["added_two_qubit_gates"] == 0
+
+
 def test_section_analysis_reports_time_and_two_qubit_bottlenecks():
     qc = QuantumCircuit(2)
     qc.h(0)

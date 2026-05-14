@@ -109,6 +109,50 @@ class QLBMResourceEstimator:
 
         return report
 
+    def estimate_pretranspiled(
+        self,
+        circuit: QuantumCircuit,
+        label: Optional[str] = None,
+        qlbm_metadata: Optional[Dict[str, Any]] = None,
+        logical_metrics: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Return resource data for a circuit that has already been transpiled.
+
+        This method intentionally does not invoke Qiskit's transpiler. The supplied
+        circuit is treated as the physical circuit to validate, calculate time, and compact by removing idle qubits.
+        """
+        transpiled_metrics = self.extract_metrics(circuit)
+        transpiled_compact_qc = self.compact_circuit(circuit)
+        report: Dict[str, Any] = {
+            "label": label,
+            "hardware": self.hardware_summary(),
+            "qlbm": qlbm_metadata or {},
+            "logical": logical_metrics,
+            "logical_capacity": None,
+            "transpiled": transpiled_metrics,
+            "transpiled_circuit": circuit,
+            "transpiled_compatibility": self.check_compatibility(
+                circuit,
+                include_coupling_violations=True,
+            ),
+            "transpiled_time": self.estimate_time(circuit),
+            "transpiled_compact": self.extract_metrics(
+                transpiled_compact_qc,
+                include_active_qubit_indices=False,
+            ),
+            "transpiled_compact_circuit": transpiled_compact_qc,
+            "section_analysis": None,
+            "overheads": self._calculate_overheads(logical_metrics, transpiled_metrics)
+            if logical_metrics is not None
+            else None,
+        }
+        return report
+
+    def compact_circuit(self, circuit: QuantumCircuit) -> QuantumCircuit:
+        """Return a copy of the circuit with idle qubits removed."""
+        return self._remove_idle_qubits(circuit)
+
     def transpile_circuit(
         self,
         circuit: QuantumCircuit,
