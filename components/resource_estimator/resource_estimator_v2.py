@@ -105,12 +105,21 @@ class QLBMResourceEstimator:
                 )
             if sectioned_circuit is not None and section_names:
                 try:
-                    report["section_analysis"] = self.analyze_sections(
+                    transpiled_sections = self._transpiled_section_circuits(
                         sectioned_circuit,
                         section_names,
                         optimization_level=optimization_level,
                         seed_transpiler=seed_transpiler,
                     )
+                    report["section_analysis"] = self._analyze_section_circuits(
+                        transpiled_sections
+                    )
+                    if phase_polynomial_analysis:
+                        report["phase_polynomial_analysis"]["section_analysis"] = (
+                            self._analyze_phase_polynomial_section_circuits(
+                                transpiled_sections
+                            )
+                        )
                 except Exception as section_exc:
                     report["section_analysis_error"] = repr(section_exc)
         except Exception as exc:
@@ -192,14 +201,51 @@ class QLBMResourceEstimator:
         seed_transpiler: Optional[int] = 42,
     ) -> Dict[str, Any]:
         """Attribute transpiled resource metrics to labeled top-level sections."""
+        return self._analyze_section_circuits(
+            self._transpiled_section_circuits(
+                sectioned_circuit,
+                section_names,
+                optimization_level=optimization_level,
+                seed_transpiler=seed_transpiler,
+            )
+        )
+
+    def analyze_phase_polynomial_sections(
+        self,
+        sectioned_circuit: QuantumCircuit,
+        section_names: List[str],
+        optimization_level: int = 1,
+        seed_transpiler: Optional[int] = 42,
+    ) -> Dict[str, Any]:
+        """Attribute phase-polynomial block summaries to transpiled sections."""
+        return self._analyze_phase_polynomial_section_circuits(
+            self._transpiled_section_circuits(
+                sectioned_circuit,
+                section_names,
+                optimization_level=optimization_level,
+                seed_transpiler=seed_transpiler,
+            )
+        )
+
+    def _transpiled_section_circuits(
+        self,
+        sectioned_circuit: QuantumCircuit,
+        section_names: List[str],
+        optimization_level: int = 1,
+        seed_transpiler: Optional[int] = 42,
+    ) -> List[Tuple[str, QuantumCircuit]]:
         transpiled = self.transpile_circuit(
             sectioned_circuit,
             optimization_level=optimization_level,
             seed_transpiler=seed_transpiler,
         )
-        section_circuits = self._split_by_section_boundaries(transpiled, section_names)
-        sections = [self._section_metrics(name, circuit) for name, circuit in section_circuits]
+        return self._split_by_section_boundaries(transpiled, section_names)
 
+    def _analyze_section_circuits(
+        self,
+        section_circuits: List[Tuple[str, QuantumCircuit]],
+    ) -> Dict[str, Any]:
+        sections = [self._section_metrics(name, circuit) for name, circuit in section_circuits]
         return {
             "sections": sections,
             "max_critical_path_time_section": self._max_section(
@@ -209,6 +255,31 @@ class QLBMResourceEstimator:
             "max_two_qubit_gate_section": self._max_section(
                 sections,
                 "num_2q_ops",
+            ),
+        }
+
+    def _analyze_phase_polynomial_section_circuits(
+        self,
+        section_circuits: List[Tuple[str, QuantumCircuit]],
+    ) -> Dict[str, Any]:
+        sections = []
+        for section_name, circuit in section_circuits:
+            section_summary = self.analyze_phase_polynomial_blocks(circuit)
+            section_summary["section"] = section_name
+            sections.append(section_summary)
+
+        return {
+            "sections": sections,
+            "max_block_count_section": self._max_section_by_keys(
+                sections,
+                ["num_blocks", "total_block_instructions"],
+            ),
+            "max_total_phase_instruction_section": self._max_section(
+                sections,
+                "total_phase_instructions",
+            ),
+            "max_largest_block_section": self._max_largest_phase_block_section(
+                sections
             ),
         }
 
@@ -500,6 +571,33 @@ class QLBMResourceEstimator:
         if not sections:
             return None
         return max(sections, key=lambda section: section[metric_name])
+
+    @staticmethod
+    def _max_section_by_keys(
+        sections: List[Dict[str, Any]],
+        metric_names: List[str],
+    ) -> Optional[Dict[str, Any]]:
+        if not sections:
+            return None
+        return max(
+            sections,
+            key=lambda section: tuple(section[metric] for metric in metric_names),
+        )
+
+    @staticmethod
+    def _max_largest_phase_block_section(
+        sections: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        if not sections:
+            return None
+        return max(
+            sections,
+            key=lambda section: (
+                section["largest_block"]["instruction_count"]
+                if section["largest_block"] is not None
+                else 0
+            ),
+        )
 
     def _serial_time(self, circuit: QuantumCircuit) -> float:
         serial_time_s = 0.0

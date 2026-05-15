@@ -130,6 +130,7 @@ def run_logical_resource_estimation(
         optimization_level=OPTIMIZATION_LEVEL,
         seed_transpiler=SEED_TRANSPILER,
         transpile_circuit=True,
+        phase_polynomial_analysis=True,
     )
 
 
@@ -291,6 +292,7 @@ def run_phase_poly_harness(
         label=f"{case['label']}-phasepoly-optimized",
         qlbm_metadata=case["metadata"],
         logical_metrics=unoptimized_report["logical"],
+        phase_polynomial_analysis=True,
     )
     require_compatible(optimized_report, "Optimized")
 
@@ -328,6 +330,12 @@ def run_phase_poly_harness(
         "unoptimized_compatibility": unoptimized_report["transpiled_compatibility"],
         "optimized_compatibility": optimized_report["transpiled_compatibility"],
         "section_analysis": unoptimized_report["section_analysis"],
+        "unoptimized_phase_polynomial_analysis": unoptimized_report[
+            "phase_polynomial_analysis"
+        ],
+        "optimized_phase_polynomial_analysis": optimized_report[
+            "phase_polynomial_analysis"
+        ],
         "optimizer_report": getattr(optimizer, "last_run_report", None),
         "counts_comparison": counts_comparison,
     }

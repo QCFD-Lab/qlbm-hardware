@@ -28,6 +28,56 @@ def simple_hardware_config():
     }
 
 
+def phase_hardware_config():
+    return {
+        "id": "phase_test_backend",
+        "architecture": "phase-polynomial test backend",
+        "num_qubits": 4,
+        "basis_gates": ["h", "x", "rz", "cx"],
+        "gate_times_s": {
+            "h": 10e-9,
+            "x": 10e-9,
+            "rz": 0.0,
+            "cx": 100e-9,
+        },
+        "measurement_time_s": 1e-6,
+    }
+
+
+def build_phase_section_test_circuits():
+    full = QuantumCircuit(4)
+    full.cx(0, 1)
+    full.rz(0.1, 1)
+    full.cx(0, 1)
+    full.rz(0.2, 1)
+    full.h(0)
+    full.cx(2, 3)
+    full.rz(0.3, 3)
+    full.cx(2, 3)
+    full.h(2)
+
+    sectioned = QuantumCircuit(4)
+    sectioned.cx(0, 1)
+    sectioned.rz(0.1, 1)
+    sectioned.barrier(label="section_boundary::initial_conditions")
+    sectioned.cx(0, 1)
+    sectioned.rz(0.2, 1)
+    sectioned.h(0)
+    sectioned.cx(2, 3)
+    sectioned.rz(0.3, 3)
+    sectioned.cx(2, 3)
+    sectioned.barrier(label="section_boundary::algorithm_step_1")
+    sectioned.h(2)
+    sectioned.barrier(label="section_boundary::algorithm_step_2")
+
+    return full, sectioned, [
+        "initial_conditions",
+        "algorithm_step_1",
+        "algorithm_step_2",
+        "measurement",
+    ]
+
+
 def test_extract_metrics_for_simple_circuit():
     qc = QuantumCircuit(2)
     qc.h(0)
@@ -150,6 +200,7 @@ def test_estimate_pretranspiled_reports_without_retranspiling(monkeypatch):
     assert report["transpiled_compact_circuit"].num_qubits == 2
     assert report["overheads"]["added_two_qubit_gates"] == 0
     assert report["phase_polynomial_analysis"]["num_blocks"] == 1
+    assert "section_analysis" not in report["phase_polynomial_analysis"]
 
 
 def test_estimate_pretranspiled_omits_phase_polynomial_analysis_by_default():
@@ -230,7 +281,53 @@ def test_estimate_includes_phase_polynomial_analysis_when_enabled():
         phase_polynomial_analysis=True,
     )
 
-    assert report["phase_polynomial_analysis"]["num_blocks"] >= 1
+    assert report["phase_polynomial_analysis"]["num_blocks"] == 1
+    assert "section_analysis" not in report["phase_polynomial_analysis"]
+
+
+def test_phase_polynomial_section_analysis_identifies_max_block_section():
+    _, sectioned_circuit, section_names = build_phase_section_test_circuits()
+    estimator = QLBMResourceEstimator(phase_hardware_config(), force_no_coupling=True)
+
+    analysis = estimator.analyze_phase_polynomial_sections(
+        sectioned_circuit,
+        section_names,
+        optimization_level=0,
+        seed_transpiler=42,
+    )
+
+    sections = {section["section"]: section for section in analysis["sections"]}
+    assert sections["initial_conditions"]["num_blocks"] == 1
+    assert sections["algorithm_step_1"]["num_blocks"] == 2
+    assert sections["algorithm_step_2"]["num_blocks"] == 0
+    assert sections["measurement"]["num_blocks"] == 0
+    assert analysis["max_block_count_section"]["section"] == "algorithm_step_1"
+    assert (
+        analysis["max_total_phase_instruction_section"]["section"]
+        == "algorithm_step_1"
+    )
+    assert analysis["max_largest_block_section"]["section"] == "algorithm_step_1"
+
+
+def test_estimate_nests_phase_polynomial_section_analysis_when_inputs_exist():
+    full_circuit, sectioned_circuit, section_names = build_phase_section_test_circuits()
+    estimator = QLBMResourceEstimator(phase_hardware_config(), force_no_coupling=True)
+
+    report = estimator.estimate(
+        full_circuit,
+        sectioned_circuit=sectioned_circuit,
+        section_names=section_names,
+        optimization_level=0,
+        seed_transpiler=42,
+        phase_polynomial_analysis=True,
+    )
+
+    phase_analysis = report["phase_polynomial_analysis"]
+    assert "section_analysis" in phase_analysis
+    assert (
+        phase_analysis["section_analysis"]["max_block_count_section"]["section"]
+        == "algorithm_step_1"
+    )
 
 
 def test_section_analysis_reports_time_and_two_qubit_bottlenecks():
