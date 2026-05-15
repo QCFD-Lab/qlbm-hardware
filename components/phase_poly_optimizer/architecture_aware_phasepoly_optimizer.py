@@ -170,6 +170,8 @@ class BlockOptimizationReport:
     candidate_cx: int
     final_cx: int
     kept_original: bool
+    residual_method: str = ""
+    residual_reduce_order: Optional[List[int]] = None
 
 
 @dataclass
@@ -189,6 +191,13 @@ class OptimizationRunReport:
     @property
     def total_final_cx(self) -> int:
         return sum(block.final_cx for block in self.block_reports)
+
+
+@dataclass
+class LinearSynthesisResult:
+    circuit: QuantumCircuit
+    method: str
+    reduce_order: Optional[List[int]]
 
 
 @dataclass
@@ -1096,6 +1105,125 @@ def synthesize_linear_transform_graph_exact(
     return qc
 
 
+def _non_cutting_peel_order(
+    architecture: ArchitectureGraph,
+    *,
+    prefer_high_index: bool,
+    dfs_priority: Optional[Dict[int, int]] = None,
+) -> List[int]:
+    remaining = list(architecture.graph.nodes)
+    order: List[int] = []
+
+    while remaining:
+        candidates = architecture.non_cutting_vertices(remaining)
+        sub = architecture.graph.subgraph(remaining)
+
+        if dfs_priority is not None:
+            chosen = max(
+                candidates,
+                key=lambda q: (dfs_priority.get(q, -1), -sub.degree[q], q),
+            )
+        elif prefer_high_index:
+            chosen = max(candidates, key=lambda q: (q, -sub.degree[q]))
+        else:
+            chosen = min(candidates, key=lambda q: (sub.degree[q], -q))
+
+        order.append(chosen)
+        remaining.remove(chosen)
+
+    return order
+
+
+def _candidate_reduce_orders(architecture: ArchitectureGraph, n: int) -> List[Tuple[str, List[int]]]:
+    orders: List[Tuple[str, List[int]]] = [
+        ("reverse", list(range(n - 1, -1, -1))),
+        ("natural", list(range(n))),
+        (
+            "degree_ascending",
+            sorted(range(n), key=lambda q: (architecture.graph.degree[q], -q)),
+        ),
+        (
+            "non_cutting_low_degree",
+            _non_cutting_peel_order(architecture, prefer_high_index=False),
+        ),
+        (
+            "non_cutting_high_index",
+            _non_cutting_peel_order(architecture, prefer_high_index=True),
+        ),
+    ]
+
+    try:
+        dfs_nodes = list(nx.dfs_postorder_nodes(architecture.graph, source=0))
+    except nx.NetworkXError:
+        dfs_nodes = list(range(n))
+    dfs_priority = {node: index for index, node in enumerate(dfs_nodes)}
+    orders.append(
+        (
+            "dfs_postorder_non_cutting",
+            _non_cutting_peel_order(
+                architecture,
+                prefer_high_index=True,
+                dfs_priority=dfs_priority,
+            ),
+        )
+    )
+
+    seen = set()
+    unique_orders: List[Tuple[str, List[int]]] = []
+    for name, order in orders:
+        key = tuple(order)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_orders.append((name, order))
+    return unique_orders
+
+
+def synthesize_linear_transform_architecture_aware_result(
+    matrix_rows: Sequence[BitVec],
+    coupling_map: CouplingMap,
+    *,
+    reduce_order: Optional[Sequence[int]] = None,
+) -> LinearSynthesisResult:
+    n = len(matrix_rows)
+    architecture = ArchitectureGraph.from_coupling_map(coupling_map, n)
+    if reduce_order is None:
+        orders = _candidate_reduce_orders(architecture, n)
+    else:
+        orders = [("specified", list(reduce_order))]
+
+    best: Optional[LinearSynthesisResult] = None
+    best_cost: Optional[Tuple[int, int, int]] = None
+
+    for name, order in orders:
+        try:
+            circuit = synthesize_linear_transform_steiner_gauss(
+                matrix_rows,
+                coupling_map,
+                reduce_order=order,
+            )
+        except (ValueError, nx.NetworkXException):
+            continue
+
+        cost = _phasepoly_cost_tuple(circuit)
+        if best is None or best_cost is None or cost < best_cost:
+            best = LinearSynthesisResult(
+                circuit=circuit,
+                method=f"steiner_gauss:{name}",
+                reduce_order=list(order),
+            )
+            best_cost = cost
+
+    if best is not None:
+        return best
+
+    return LinearSynthesisResult(
+        circuit=synthesize_linear_transform_graph_exact(matrix_rows, coupling_map),
+        method="graph_exact_fallback",
+        reduce_order=None,
+    )
+
+
 def synthesize_linear_transform_architecture_aware(
     matrix_rows: Sequence[BitVec],
     coupling_map: CouplingMap,
@@ -1110,14 +1238,11 @@ def synthesize_linear_transform_architecture_aware(
     directed Steiner walk fails, it falls back to an exact local-CX construction
     rather than rejecting an otherwise valid phase-polynomial block.
     """
-    try:
-        return synthesize_linear_transform_steiner_gauss(
-            matrix_rows,
-            coupling_map,
-            reduce_order=reduce_order,
-        )
-    except ValueError:
-        return synthesize_linear_transform_graph_exact(matrix_rows, coupling_map)
+    return synthesize_linear_transform_architecture_aware_result(
+        matrix_rows,
+        coupling_map,
+        reduce_order=reduce_order,
+    ).circuit
 
 
 def _dedup_edges_preserve_order(edges: Sequence[Tuple[int, int]]) -> List[Tuple[int, int]]:
@@ -1236,7 +1361,11 @@ class ArchitectureAwarePhasePolyOptimizer:
         )
 
         residual_rows = residual_linear_transform(phase_poly.out_parities, emitted_out_parities)
-        residual_circuit = synthesize_linear_transform_architecture_aware(residual_rows, coupling_map)
+        residual_result = synthesize_linear_transform_architecture_aware_result(
+            residual_rows,
+            coupling_map,
+        )
+        residual_circuit = residual_result.circuit
 
         candidate = QuantumCircuit(circuit.num_qubits)
         candidate.compose(phase_circuit, inplace=True)
@@ -1265,6 +1394,8 @@ class ArchitectureAwarePhasePolyOptimizer:
             candidate_cx=int(candidate.count_ops().get("cx", 0)),
             final_cx=int(final_circuit.count_ops().get("cx", 0)),
             kept_original=kept_original,
+            residual_method=residual_result.method,
+            residual_reduce_order=residual_result.reduce_order,
         )
 
         return final_circuit, report
@@ -1323,6 +1454,7 @@ class ArchitectureAwarePhasePolyOptimizer:
                     candidate_cx=int(compact.count_ops().get("cx", 0)),
                     final_cx=int(compact.count_ops().get("cx", 0)),
                     kept_original=True,
+                    residual_method="skipped_disconnected",
                 )
 
             report.start = block.start

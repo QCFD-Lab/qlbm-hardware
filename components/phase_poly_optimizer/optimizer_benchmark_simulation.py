@@ -249,6 +249,14 @@ def summarize_optimizer_report(report: Any) -> Optional[Dict[str, Any]]:
     disconnected = sum(
         1 for block in block_reports if not block.connected_active_subgraph
     )
+    residual_methods: Dict[str, int] = {}
+    residual_cx_by_method: Dict[str, int] = {}
+    for block in block_reports:
+        method = getattr(block, "residual_method", "") or "unknown"
+        residual_methods[method] = residual_methods.get(method, 0) + 1
+        residual_cx_by_method[method] = (
+            residual_cx_by_method.get(method, 0) + block.residual_cx
+        )
 
     return {
         "circuit_num_qubits": report.circuit_num_qubits,
@@ -259,6 +267,8 @@ def summarize_optimizer_report(report: Any) -> Optional[Dict[str, Any]]:
         "cx_delta_vs_original": final_cx - original_cx,
         "num_blocks_kept_original": kept_original,
         "num_disconnected_blocks": disconnected,
+        "residual_methods": residual_methods,
+        "residual_cx_by_method": residual_cx_by_method,
     }
 
 
