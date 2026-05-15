@@ -2,10 +2,13 @@ from qiskit import QuantumCircuit
 from qiskit.circuit import Qubit
 from qiskit.transpiler import CouplingMap
 
+from components.phase_poly_optimizer import architecture_aware_phasepoly_optimizer as aa
 from components.phase_poly_optimizer.architecture_aware_phasepoly_optimizer import (
     ArchitectureAwarePhasePolyOptimizer,
     PhasePolynomialBlock,
     find_phase_polynomial_blocks,
+    synthesize_linear_transform_all_to_all,
+    synthesize_linear_transform_architecture_aware,
     unitary_equiv_up_to_global_phase,
 )
 
@@ -192,3 +195,23 @@ def test_optimize_preserves_disjoint_passthrough_gates_inside_relaxed_block() ->
     assert optimized.count_ops().get("x", 0) == 1
     assert optimized.count_ops().get("sx", 0) == 1
     assert [inst.operation.name for inst in optimized.data] == [inst.operation.name for inst in circuit.data]
+
+
+def test_residual_synthesis_falls_back_to_local_exact_circuit(monkeypatch) -> None:
+    rows = [
+        (1, 0, 0),
+        (1, 1, 0),
+        (1, 1, 1),
+    ]
+    coupling_map = CouplingMap([(0, 1), (1, 0), (1, 2), (2, 1)])
+
+    def fail_steiner(*args, **kwargs):
+        raise ValueError("forced steiner failure")
+
+    monkeypatch.setattr(aa, "synthesize_linear_transform_steiner_gauss", fail_steiner)
+
+    expected = synthesize_linear_transform_all_to_all(rows)
+    actual = synthesize_linear_transform_architecture_aware(rows, coupling_map)
+
+    assert unitary_equiv_up_to_global_phase(expected, actual)
+    _assert_cxs_are_local(actual, coupling_map)

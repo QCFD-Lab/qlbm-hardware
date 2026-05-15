@@ -1,0 +1,237 @@
+{
+  "label": "abqlbm-d2q9-8x4-g1-t1-phasepoly-optimized",
+  "hardware": {
+    "id": "google willow 2024",
+    "architecture": "superconducting transmon",
+    "device_name": "Willow",
+    "year_reported": 2024,
+    "num_qubits": 105,
+    "topology_num_qubits": 105,
+    "basis_gates": [
+      "rz",
+      "sx",
+      "x",
+      "cx"
+    ],
+    "coupling_type": "2d_grid",
+    "num_couplings": 378,
+    "directed_coupling": false,
+    "validation_warnings": []
+  },
+  "qlbm": {
+    "algorithm": "ABQLBM",
+    "lattice": {
+      "lattice": {
+        "dim": {
+          "x": 8,
+          "y": 4
+        },
+        "velocities": "d2q9"
+      },
+      "geometry": [
+        {
+          "shape": "cuboid",
+          "x": [
+            5,
+            7
+          ],
+          "y": [
+            2,
+            3
+          ],
+          "boundary": "bounceback"
+        }
+      ]
+    },
+    "num_timesteps": 1
+  },
+  "logical": {
+    "num_qubits": 12,
+    "num_clbits": 5,
+    "depth": 526,
+    "size": 1026,
+    "width": 17,
+    "op_counts": {
+      "x": 219,
+      "h": 194,
+      "mcphase": 180,
+      "cp": 168,
+      "swap": 72,
+      "p": 68,
+      "ccx": 64,
+      "cx": 20,
+      "s": 8,
+      "t": 8,
+      "tdg": 8,
+      "sdg": 8,
+      "measure": 5,
+      "mcmt": 3,
+      "ry": 1
+    },
+    "num_1q_ops": 514,
+    "num_2q_ops": 323,
+    "num_3q_plus_ops": 184,
+    "num_measure": 5,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.31635651322233105
+  },
+  "logical_capacity": null,
+  "transpiled": {
+    "num_qubits": 105,
+    "num_clbits": 5,
+    "depth": 23138,
+    "size": 32015,
+    "width": 110,
+    "op_counts": {
+      "cx": 18297,
+      "rz": 11484,
+      "sx": 2010,
+      "x": 219,
+      "measure": 5
+    },
+    "num_1q_ops": 13713,
+    "num_2q_ops": 18297,
+    "num_3q_plus_ops": 0,
+    "num_measure": 5,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.5716026241799438,
+    "active_qubits": 20,
+    "active_qubit_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ]
+  },
+  "transpiled_circuit": {
+    "num_qubits": 105,
+    "num_clbits": 5,
+    "depth": 23138,
+    "size": 32015,
+    "op_counts": {
+      "cx": 18297,
+      "rz": 11484,
+      "sx": 2010,
+      "x": 219,
+      "measure": 5
+    }
+  },
+  "transpiled_compatibility": {
+    "compatible": true,
+    "qubit_capacity_ok": true,
+    "used_qubits": 20,
+    "available_qubits": 105,
+    "basis_gates_ok": true,
+    "unsupported_gates": [],
+    "coupling_map_checked": true,
+    "coupling_map_ok": true,
+    "num_coupling_violations": 0,
+    "coupling_violations": []
+  },
+  "transpiled_time": {
+    "timing_model": "qiskit_asap_schedule",
+    "scheduled_duration_s": 0.0029469750000000144,
+    "max_idle_time_s": 0.0023039250000000044,
+    "serial_time_s": 0.0037201249999999995,
+    "critical_path_time_s": 0.0031461750000001103,
+    "unknown_gate_times": [],
+    "measurement_time_included": true,
+    "warnings": []
+  },
+  "transpiled_compact": {
+    "num_qubits": 20,
+    "num_clbits": 5,
+    "depth": 23138,
+    "size": 32015,
+    "width": 25,
+    "op_counts": {
+      "cx": 18297,
+      "rz": 11484,
+      "sx": 2010,
+      "x": 219,
+      "measure": 5
+    },
+    "num_1q_ops": 13713,
+    "num_2q_ops": 18297,
+    "num_3q_plus_ops": 0,
+    "num_measure": 5,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.5716026241799438,
+    "active_qubits": 20
+  },
+  "transpiled_compact_circuit": {
+    "num_qubits": 20,
+    "num_clbits": 5,
+    "depth": 23138,
+    "size": 32015,
+    "op_counts": {
+      "cx": 18297,
+      "rz": 11484,
+      "sx": 2010,
+      "x": 219,
+      "measure": 5
+    }
+  },
+  "section_analysis": null,
+  "overheads": {
+    "depth_ratio": 43.98859315589353,
+    "size_ratio": 31.203703703703702,
+    "two_qubit_gate_ratio": 56.64705882352941,
+    "added_depth": 22612,
+    "added_size": 30989,
+    "added_two_qubit_gates": 17974
+  },
+  "phase_polynomial_analysis": {
+    "num_blocks": 2163,
+    "total_block_instructions": 29781,
+    "total_phase_instructions": 29781,
+    "total_passthrough_instructions": 0,
+    "total_rz": 11484,
+    "total_cx": 18297,
+    "average_block_instructions": 13.768377253814148,
+    "average_phase_instructions": 13.768377253814148,
+    "average_active_qubits": 3.218677762367083,
+    "largest_block": {
+      "start": 9856,
+      "end": 9971,
+      "instruction_count": 116,
+      "phase_instruction_count": 116,
+      "passthrough_instruction_count": 0,
+      "active_qubits": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        13,
+        14
+      ],
+      "active_qubit_count": 8,
+      "rz_count": 30,
+      "cx_count": 86
+    }
+  }
+}

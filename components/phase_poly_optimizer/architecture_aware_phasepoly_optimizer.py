@@ -1069,18 +1069,17 @@ def _apply_row_swap_via_xors(matrix: Matrix, a: int, b: int, ops: List[Tuple[int
     ops.append((b, a))
 
 
-
-def synthesize_linear_transform_all_to_all(matrix_rows: Sequence[BitVec]) -> QuantumCircuit:
+def _row_add_sequence_for_linear_transform(matrix_rows: Sequence[BitVec]) -> List[Tuple[int, int]]:
     """
-    Synthesize an invertible GF(2) linear transform using CNOTs on full connectivity.
+    Return all-to-all row-add operations whose CNOT circuit implements `matrix_rows`.
 
-    The returned circuit is not architecture-aware. For now this is used only as a
-    temporary fallback for the final residual transform; it can then be routed by Qiskit.
+    The sequence is produced by reducing the target matrix to identity and reversing
+    the reduction operations. Each tuple is a logical CX(control, target).
     """
     matrix = gf2_matrix_from_rows(matrix_rows)
     n = len(matrix)
     if n == 0:
-        return QuantumCircuit(0)
+        return []
     if any(len(row) != n for row in matrix):
         raise ValueError("Linear transform synthesis requires a square matrix.")
 
@@ -1103,10 +1102,100 @@ def synthesize_linear_transform_all_to_all(matrix_rows: Sequence[BitVec]) -> Qua
                 _apply_row_add(work, col, row)
                 reduction_ops.append((col, row))
 
+    return list(reversed(reduction_ops))
+
+
+def synthesize_linear_transform_all_to_all(matrix_rows: Sequence[BitVec]) -> QuantumCircuit:
+    """
+    Synthesize an invertible GF(2) linear transform using CNOTs on full connectivity.
+
+    The returned circuit is not architecture-aware. It is mainly useful as a small
+    correctness baseline and as the logical operation list for routed fallbacks.
+    """
+    n = len(matrix_rows)
     qc = QuantumCircuit(n)
-    for control, target in reversed(reduction_ops):
+    for control, target in _row_add_sequence_for_linear_transform(matrix_rows):
         qc.cx(control, target)
     return qc
+
+
+def _append_swap_via_cx(circuit: QuantumCircuit, a: int, b: int) -> None:
+    circuit.cx(a, b)
+    circuit.cx(b, a)
+    circuit.cx(a, b)
+
+
+def _append_remote_cx_via_restored_swaps(
+    circuit: QuantumCircuit,
+    control: int,
+    target: int,
+    architecture: ArchitectureGraph,
+) -> None:
+    """
+    Append a logical CX(control, target) using only architecture-local CX gates.
+
+    The temporary SWAP chain restores the original logical placement before return,
+    so a sequence of these routed CNOTs implements the same all-to-all row-add
+    sequence on the original logical qubit indices.
+    """
+    if control == target:
+        return
+    path = architecture.shortest_path(control, target)
+    if len(path) == 2:
+        circuit.cx(control, target)
+        return
+
+    for i in range(len(path) - 2):
+        _append_swap_via_cx(circuit, path[i], path[i + 1])
+
+    circuit.cx(path[-2], path[-1])
+
+    for i in range(len(path) - 3, -1, -1):
+        _append_swap_via_cx(circuit, path[i], path[i + 1])
+
+
+def synthesize_linear_transform_graph_exact(
+    matrix_rows: Sequence[BitVec],
+    coupling_map: CouplingMap,
+) -> QuantumCircuit:
+    """
+    Correctness-first graph-constrained synthesis of an invertible GF(2) transform.
+
+    This is used as a fallback when the recursive Steiner-Gauss heuristic cannot
+    find a directed reduction subproblem for the chosen order. It is usually larger
+    than a successful Steiner-Gauss circuit, but it preserves the requested linear
+    transform exactly and uses only edges of the undirected architecture graph.
+    """
+    n = len(matrix_rows)
+    architecture = ArchitectureGraph.from_coupling_map(coupling_map, n)
+    qc = QuantumCircuit(n)
+    for control, target in _row_add_sequence_for_linear_transform(matrix_rows):
+        _append_remote_cx_via_restored_swaps(qc, control, target, architecture)
+    return qc
+
+
+def synthesize_linear_transform_architecture_aware(
+    matrix_rows: Sequence[BitVec],
+    coupling_map: CouplingMap,
+    *,
+    reduce_order: Optional[Sequence[int]] = None,
+) -> QuantumCircuit:
+    """
+    Synthesize the residual basis transform using the paper's Steiner-Gauss step.
+
+    The reference implementation treats Steiner-Gauss as the post-processing for
+    ``A * P'^-1``. This port first tries that reducer. If its order-dependent
+    directed Steiner walk fails, it falls back to an exact local-CX construction
+    rather than rejecting an otherwise valid phase-polynomial block.
+    """
+    try:
+        return synthesize_linear_transform_steiner_gauss(
+            matrix_rows,
+            coupling_map,
+            reduce_order=reduce_order,
+        )
+    except ValueError:
+        return synthesize_linear_transform_graph_exact(matrix_rows, coupling_map)
 
 
 def _tree_top_down_edges(children: Dict[int, List[int]], root: int) -> List[Tuple[int, int]]:
@@ -1280,7 +1369,7 @@ class ArchitectureAwarePhasePolyOptimizer:
         )
 
         residual_rows = residual_linear_transform(phase_poly.out_parities, emitted_out_parities)
-        residual_circuit = synthesize_linear_transform_steiner_gauss(residual_rows, coupling_map)
+        residual_circuit = synthesize_linear_transform_architecture_aware(residual_rows, coupling_map)
 
         candidate = QuantumCircuit(circuit.num_qubits)
         candidate.compose(phase_circuit, inplace=True)

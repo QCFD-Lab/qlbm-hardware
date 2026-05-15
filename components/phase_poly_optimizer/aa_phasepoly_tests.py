@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+for path in (PROJECT_ROOT / "qlbm-hardware", PROJECT_ROOT / "qlbm"):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
 from architecture_aware_phasepoly_optimizer import *
 from components.phase_poly_optimizer.architecture_aware_phasepoly_optimizer import _qubit_index_map
 
@@ -288,33 +296,37 @@ def compare_phase_support_only(input_block: QuantumCircuit, coupling_map: Coupli
         "residual": [parity_to_str(p) for p in residual],
     }
 
+def main() -> None:
+    lin_results = run_linear_synthesis_sanity_tests()
+    bad = [r for r in lin_results if not r["ok"]]
+    print("bad linear tests:", len(bad))
+    if bad:
+        print(bad[0])
+
+    diag = diagnose_toy_case("three_qubit_line")
+    print("residual_matches_rows:", diag["residual_matches_rows"])
+    print("equiv_total:", diag["equiv_total"])
+    print("desired_out_parities:", diag["desired_out_parities"])
+    print("emitted_out_parities:", diag["emitted_out_parities"])
+    print("residual_rows:", diag["residual_rows"])
+
+    results = run_toy_phasepoly_tests()
+    for r in results:
+        print(r["name"], r["equivalent"], r["input_cx"], r["optimized_cx"])
+
+    sg_results = run_steiner_gauss_sanity_tests()
+    for r in sg_results:
+        print(r["name"], r["ok"], r["cx"], r["depth"])
+
+    opt = ArchitectureAwarePhasePolyOptimizer(keep_original_if_worse=False)
+    qc, cmap = _toy_block_four_qubit_line()
+    out = opt.optimize(qc, cmap)
+    print(
+        unitary_equiv_up_to_global_phase(qc, out),
+        qc.count_ops().get("cx", 0),
+        out.count_ops().get("cx", 0),
+    )
 
 
-
-lin_results = run_linear_synthesis_sanity_tests()
-bad = [r for r in lin_results if not r["ok"]]
-print("bad linear tests:", len(bad))
-if bad:
-    print(bad[0])
-
-diag = diagnose_toy_case("three_qubit_line")
-print("residual_matches_rows:", diag["residual_matches_rows"])
-print("equiv_total:", diag["equiv_total"])
-print("desired_out_parities:", diag["desired_out_parities"])
-print("emitted_out_parities:", diag["emitted_out_parities"])
-print("residual_rows:", diag["residual_rows"])
-
-
-results = run_toy_phasepoly_tests()
-for r in results:
-    print(r["name"], r["equivalent"], r["input_cx"], r["optimized_cx"])
-
-sg_results = run_steiner_gauss_sanity_tests()
-for r in sg_results:
-    print(r["name"], r["ok"], r["cx"], r["depth"])
-
-
-opt = ArchitectureAwarePhasePolyOptimizer(keep_original_if_worse=False)
-qc, cmap = _toy_block_four_qubit_line()
-out = opt.optimize(qc, cmap)
-print(unitary_equiv_up_to_global_phase(qc, out), qc.count_ops().get("cx", 0), out.count_ops().get("cx", 0))
+if __name__ == "__main__":
+    main()
