@@ -84,7 +84,7 @@ def build_ab_8x4_case(num_steps: int) -> Dict[str, Any]:
     }
     lattice = ABLattice(lattice_data)
     initial_conditions = ABInitialConditions(lattice)
-    algorithm = ABQLBM(lattice)
+    algorithm = ABQLBM(lattice, use_agnostic_bcs=False)
     postprocessing = EmptyPrimitive(lattice)
     measurement = ABGridMeasurement(lattice)
     sectioned_circuit, section_names = build_sectioned_logical_circuit(
@@ -236,6 +236,32 @@ def json_safe(value: Any) -> Any:
     return value
 
 
+def summarize_optimizer_report(report: Any) -> Optional[Dict[str, Any]]:
+    """Summarize optimizer diagnostics without serializing every block report."""
+    if report is None:
+        return None
+
+    block_reports = list(getattr(report, "block_reports", []) or [])
+    original_cx = sum(block.original_cx for block in block_reports)
+    candidate_cx = sum(block.candidate_cx for block in block_reports)
+    final_cx = sum(block.final_cx for block in block_reports)
+    kept_original = sum(1 for block in block_reports if block.kept_original)
+    disconnected = sum(
+        1 for block in block_reports if not block.connected_active_subgraph
+    )
+
+    return {
+        "circuit_num_qubits": report.circuit_num_qubits,
+        "num_blocks": report.num_blocks,
+        "total_original_cx": original_cx,
+        "total_candidate_cx": candidate_cx,
+        "total_final_cx": final_cx,
+        "cx_delta_vs_original": final_cx - original_cx,
+        "num_blocks_kept_original": kept_original,
+        "num_disconnected_blocks": disconnected,
+    }
+
+
 def write_json_report(path: Path, payload: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as file:
@@ -336,7 +362,9 @@ def run_phase_poly_harness(
         "optimized_phase_polynomial_analysis": optimized_report[
             "phase_polynomial_analysis"
         ],
-        "optimizer_report": getattr(optimizer, "last_run_report", None),
+        "optimizer_report": summarize_optimizer_report(
+            getattr(optimizer, "last_run_report", None)
+        ),
         "counts_comparison": counts_comparison,
     }
     write_json_report(output_file_path_base / "resource_report.json", unoptimized_report)

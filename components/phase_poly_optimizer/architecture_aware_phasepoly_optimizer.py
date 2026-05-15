@@ -363,41 +363,6 @@ class ArchitectureGraph:
 
         return top_down, bottom_up
 
-    def rooted_steiner_tree_children(
-        self,
-        root: int,
-        terminals: Sequence[int],
-        allowed: Optional[Sequence[int]] = None,
-    ) -> Dict[int, List[int]]:
-        """
-        Approximate Steiner tree rooted at `root` by taking the union of shortest
-        paths from `root` to all terminals inside the allowed subgraph, then
-        extracting a rooted BFS tree.
-        """
-        allowed_nodes = list(self.graph.nodes) if allowed is None else list(allowed)
-        sub = self.graph.subgraph(allowed_nodes)
-        if root not in sub:
-            raise ValueError(f"Root {root} is not present in the allowed architecture subgraph.")
-
-        terminals = sorted(set(terminals))
-        for t in terminals:
-            if t not in sub:
-                raise ValueError(f"Terminal {t} is not present in the allowed architecture subgraph.")
-
-        union_graph = nx.Graph()
-        union_graph.add_node(root)
-        for terminal in terminals:
-            path = nx.shortest_path(sub, source=root, target=terminal)
-            union_graph.add_nodes_from(path)
-            union_graph.add_edges_from((path[i], path[i + 1]) for i in range(len(path) - 1))
-
-        bfs_tree = nx.bfs_tree(union_graph, source=root)
-        children: Dict[int, List[int]] = {node: [] for node in bfs_tree.nodes}
-        for parent, child in bfs_tree.edges:
-            children[parent].append(child)
-            children.setdefault(child, [])
-        return children
-
     def non_cutting_vertices(self, qubits: Sequence[int]) -> List[int]:
         sub_nodes = list(qubits)
         if not sub_nodes:
@@ -409,32 +374,10 @@ class ArchitectureGraph:
         out = [q for q in sub_nodes if q not in articulation]
         return out if out else sub_nodes[:]
 
-    def heuristic_reduce_order(self, nodes: Optional[Sequence[int]] = None) -> List[int]:
-        """
-        Compute an elimination order by repeatedly removing low-degree non-cutting
-        vertices. This is a generic analogue of the repo's architecture-specific
-        `reduce_order` and is used for residual Steiner-Gauss synthesis.
-        """
-        remaining = list(self.graph.nodes if nodes is None else nodes)
-        order: List[int] = []
-
-        while remaining:
-            candidates = self.non_cutting_vertices(remaining)
-            sub = self.graph.subgraph(remaining)
-            chosen = min(candidates, key=lambda q: (sub.degree[q], -q))
-            order.append(chosen)
-            remaining.remove(chosen)
-
-        return order
-
 
 # =========================
 # Block validation/extraction
 # =========================
-
-
-ALLOWED_BLOCK_GATES = {"cx", "rz", "barrier"}
-
 
 
 def _qubit_index_map(circuit: QuantumCircuit) -> Dict[Qubit, int]:
@@ -720,10 +663,9 @@ class _RecursiveSynthState:
     columns: Dict[int, PhaseColumn]
     circuit: QuantumCircuit
     emitted_out_parities: List[BitVec]
-    debug: bool = False
 
     @classmethod
-    def from_phase_poly(cls, phase_poly: PhasePolynomial, *, debug: bool = False) -> "_RecursiveSynthState":
+    def from_phase_poly(cls, phase_poly: PhasePolynomial) -> "_RecursiveSynthState":
         columns: Dict[int, PhaseColumn] = {}
         for cid, (parity, angle) in enumerate(phase_poly.zphases.items()):
             columns[cid] = PhaseColumn(column_id=cid, bits=list(parity), angle=angle)
@@ -732,7 +674,6 @@ class _RecursiveSynthState:
             columns=columns,
             circuit=QuantumCircuit(phase_poly.num_qubits),
             emitted_out_parities=gf2_identity(phase_poly.num_qubits),
-            debug=debug,
         )
 
     def active_column_ids(self) -> List[int]:
@@ -851,8 +792,6 @@ def _one_recurse(
 def synthesize_phase_support_architecture_aware(
     phase_poly: PhasePolynomial,
     coupling_map: CouplingMap,
-    *,
-    debug: bool = False,
 ) -> Tuple[QuantumCircuit, List[BitVec]]:
     """
     Synthesize only the phase-support part using the paper's architecture-aware recursion.
@@ -866,7 +805,7 @@ def synthesize_phase_support_architecture_aware(
         to compute the final residual transform A * P'^-1.
     """
     architecture = ArchitectureGraph.from_coupling_map(coupling_map, phase_poly.num_qubits)
-    state = _RecursiveSynthState.from_phase_poly(phase_poly, debug=debug)
+    state = _RecursiveSynthState.from_phase_poly(phase_poly)
     initial_columns = state.reduce_trivial_columns(state.active_column_ids())
     _base_recurse(state, architecture, initial_columns, list(range(phase_poly.num_qubits)))
     return state.circuit, state.emitted_out_parities
@@ -1035,10 +974,7 @@ def synthesize_linear_transform_steiner_gauss(
 
             pivot -= 1
 
-    if reduce_order is None:
-        reduce_order = architecture.heuristic_reduce_order()
-    else:
-        reduce_order = list(reduce_order)
+    reduce_order = list(range(n - 1, -1, -1)) if reduce_order is None else list(reduce_order)
     if sorted(reduce_order) != list(range(n)):
         raise ValueError("reduce_order must be a permutation of range(n).")
     rec_step(reduce_order, list(reversed(reduce_order)))
@@ -1103,20 +1039,6 @@ def _row_add_sequence_for_linear_transform(matrix_rows: Sequence[BitVec]) -> Lis
                 reduction_ops.append((col, row))
 
     return list(reversed(reduction_ops))
-
-
-def synthesize_linear_transform_all_to_all(matrix_rows: Sequence[BitVec]) -> QuantumCircuit:
-    """
-    Synthesize an invertible GF(2) linear transform using CNOTs on full connectivity.
-
-    The returned circuit is not architecture-aware. It is mainly useful as a small
-    correctness baseline and as the logical operation list for routed fallbacks.
-    """
-    n = len(matrix_rows)
-    qc = QuantumCircuit(n)
-    for control, target in _row_add_sequence_for_linear_transform(matrix_rows):
-        qc.cx(control, target)
-    return qc
 
 
 def _append_swap_via_cx(circuit: QuantumCircuit, a: int, b: int) -> None:
@@ -1198,29 +1120,6 @@ def synthesize_linear_transform_architecture_aware(
         return synthesize_linear_transform_graph_exact(matrix_rows, coupling_map)
 
 
-def _tree_top_down_edges(children: Dict[int, List[int]], root: int) -> List[Tuple[int, int]]:
-    edges: List[Tuple[int, int]] = []
-
-    def walk(node: int) -> None:
-        for child in children.get(node, []):
-            edges.append((node, child))
-            walk(child)
-
-    walk(root)
-    return edges
-
-
-def _tree_bottom_up_edges(children: Dict[int, List[int]], root: int) -> List[Tuple[int, int]]:
-    edges: List[Tuple[int, int]] = []
-
-    def walk(node: int) -> None:
-        for child in children.get(node, []):
-            walk(child)
-            edges.append((node, child))
-
-    walk(root)
-    return edges
-
 def _dedup_edges_preserve_order(edges: Sequence[Tuple[int, int]]) -> List[Tuple[int, int]]:
     seen = set()
     out: List[Tuple[int, int]] = []
@@ -1298,37 +1197,6 @@ def _cx_gates_respect_coupling_map(circuit: QuantumCircuit, coupling_map: Coupli
 
 
 # =========================
-# Emission helpers
-# =========================
-
-
-
-def emit_phase_polynomial_naive(phase_poly: PhasePolynomial) -> QuantumCircuit:
-    """
-    Naive emitter used only for sanity checks during development.
-
-    For each parity in support, build the parity onto one pivot qubit with a CX ladder,
-    apply RZ(angle), then uncompute.
-    """
-    qc = QuantumCircuit(phase_poly.num_qubits)
-
-    for parity, angle in phase_poly.zphases.items():
-        support = [i for i, bit in enumerate(parity) if bit == 1]
-        if not support:
-            continue
-        pivot = support[-1]
-        others = support[:-1]
-
-        for q in others:
-            qc.cx(q, pivot)
-        qc.rz(angle, pivot)
-        for q in reversed(others):
-            qc.cx(q, pivot)
-
-    return qc
-
-
-# =========================
 # Public optimizer
 # =========================
 
@@ -1365,7 +1233,6 @@ class ArchitectureAwarePhasePolyOptimizer:
         phase_circuit, emitted_out_parities = synthesize_phase_support_architecture_aware(
             phase_poly,
             coupling_map,
-            debug=self.debug,
         )
 
         residual_rows = residual_linear_transform(phase_poly.out_parities, emitted_out_parities)

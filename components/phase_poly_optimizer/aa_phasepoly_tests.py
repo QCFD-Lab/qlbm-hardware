@@ -135,48 +135,6 @@ def linear_transform_matches(matrix_rows: Sequence[BitVec], circuit: QuantumCirc
 
 
 
-def random_invertible_gf2_matrix(n: int, rng: np.random.Generator) -> List[BitVec]:
-    while True:
-        mat = rng.integers(0, 2, size=(n, n), endpoint=False).tolist()
-        try:
-            _ = gf2_inverse(mat)
-            return gf2_matrix_to_rows(mat)
-        except ValueError:
-            continue
-
-
-
-def run_linear_synthesis_sanity_tests(
-    *,
-    max_qubits: int = 5,
-    trials_per_qubits: int = 10,
-    seed: int = 1234,
-) -> List[Dict[str, object]]:
-    """
-    Directly test the all-to-all linear synthesizer on random invertible GF(2) matrices.
-    This remains useful as a debugging baseline for the unconstrained helper.
-    """
-    rng = np.random.default_rng(seed)
-    results: List[Dict[str, object]] = []
-    for n in range(1, max_qubits + 1):
-        for trial in range(trials_per_qubits):
-            rows = random_invertible_gf2_matrix(n, rng)
-            qc = synthesize_linear_transform_all_to_all(rows)
-            ok = linear_transform_matches(rows, qc)
-            results.append(
-                {
-                    "num_qubits": n,
-                    "trial": trial,
-                    "ok": ok,
-                    "rows": [parity_to_str(r) for r in rows],
-                    "cx": qc.count_ops().get("cx", 0),
-                    "depth": qc.depth(),
-                }
-            )
-    return results
-
-
-
 def run_steiner_gauss_sanity_tests() -> List[Dict[str, object]]:
     """
     Directly test the architecture-aware residual synthesizer on a few small connected
@@ -297,12 +255,6 @@ def compare_phase_support_only(input_block: QuantumCircuit, coupling_map: Coupli
     }
 
 def main() -> None:
-    lin_results = run_linear_synthesis_sanity_tests()
-    bad = [r for r in lin_results if not r["ok"]]
-    print("bad linear tests:", len(bad))
-    if bad:
-        print(bad[0])
-
     diag = diagnose_toy_case("three_qubit_line")
     print("residual_matches_rows:", diag["residual_matches_rows"])
     print("equiv_total:", diag["equiv_total"])

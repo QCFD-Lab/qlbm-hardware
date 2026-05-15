@@ -7,7 +7,6 @@ from components.phase_poly_optimizer.architecture_aware_phasepoly_optimizer impo
     ArchitectureAwarePhasePolyOptimizer,
     PhasePolynomialBlock,
     find_phase_polynomial_blocks,
-    synthesize_linear_transform_all_to_all,
     synthesize_linear_transform_architecture_aware,
     unitary_equiv_up_to_global_phase,
 )
@@ -210,7 +209,9 @@ def test_residual_synthesis_falls_back_to_local_exact_circuit(monkeypatch) -> No
 
     monkeypatch.setattr(aa, "synthesize_linear_transform_steiner_gauss", fail_steiner)
 
-    expected = synthesize_linear_transform_all_to_all(rows)
+    expected = QuantumCircuit(3)
+    expected.cx(0, 1)
+    expected.cx(1, 2)
     actual = synthesize_linear_transform_architecture_aware(rows, coupling_map)
 
     assert unitary_equiv_up_to_global_phase(expected, actual)
