@@ -1,0 +1,974 @@
+{
+  "case": "abqlbm-d2q9-8x4-g1-t10",
+  "hardware": "superconducting_google_willow_2024",
+  "num_steps": 10,
+  "num_shots": 4096,
+  "output_file_path_base": "/Users/daglarcoban/Projects/MEP/qlbm-hardware/components/phase_poly_optimizer/output/abqlbm-d2q9-8x4-g1-t10",
+  "output_file_path_optimized": "/Users/daglarcoban/Projects/MEP/qlbm-hardware/components/phase_poly_optimizer/output/abqlbm-d2q9-8x4-g1-t10-optimized",
+  "unoptimized_metrics": {
+    "num_qubits": 105,
+    "num_clbits": 5,
+    "depth": 269807,
+    "size": 416795,
+    "width": 110,
+    "op_counts": {
+      "cx": 220986,
+      "rz": 158611,
+      "sx": 29210,
+      "x": 7983,
+      "measure": 5
+    },
+    "num_1q_ops": 195804,
+    "num_2q_ops": 220986,
+    "num_3q_plus_ops": 0,
+    "num_measure": 5,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.5302094580004318,
+    "active_qubits": 20,
+    "active_qubit_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ]
+  },
+  "optimized_metrics": {
+    "num_qubits": 105,
+    "num_clbits": 5,
+    "depth": 243501,
+    "size": 383946,
+    "width": 110,
+    "op_counts": {
+      "cx": 210049,
+      "rz": 136699,
+      "sx": 29210,
+      "x": 7983,
+      "measure": 5
+    },
+    "num_1q_ops": 173892,
+    "num_2q_ops": 210049,
+    "num_3q_plus_ops": 0,
+    "num_measure": 5,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.5470866617527173,
+    "active_qubits": 20,
+    "active_qubit_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ]
+  },
+  "unoptimized_compact_metrics": {
+    "num_qubits": 20,
+    "num_clbits": 5,
+    "depth": 269807,
+    "size": 416795,
+    "width": 25,
+    "op_counts": {
+      "cx": 220986,
+      "rz": 158611,
+      "sx": 29210,
+      "x": 7983,
+      "measure": 5
+    },
+    "num_1q_ops": 195804,
+    "num_2q_ops": 220986,
+    "num_3q_plus_ops": 0,
+    "num_measure": 5,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.5302094580004318,
+    "active_qubits": 20
+  },
+  "optimized_compact_metrics": {
+    "num_qubits": 20,
+    "num_clbits": 5,
+    "depth": 243501,
+    "size": 383946,
+    "width": 25,
+    "op_counts": {
+      "cx": 210049,
+      "rz": 136699,
+      "sx": 29210,
+      "x": 7983,
+      "measure": 5
+    },
+    "num_1q_ops": 173892,
+    "num_2q_ops": 210049,
+    "num_3q_plus_ops": 0,
+    "num_measure": 5,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.5470866617527173,
+    "active_qubits": 20
+  },
+  "unoptimized_compatibility": {
+    "compatible": true,
+    "qubit_capacity_ok": true,
+    "used_qubits": 20,
+    "available_qubits": 105,
+    "basis_gates_ok": true,
+    "unsupported_gates": [],
+    "coupling_map_checked": true,
+    "coupling_map_ok": true,
+    "num_coupling_violations": 0,
+    "coupling_violations": []
+  },
+  "optimized_compatibility": {
+    "compatible": true,
+    "qubit_capacity_ok": true,
+    "used_qubits": 20,
+    "available_qubits": 105,
+    "basis_gates_ok": true,
+    "unsupported_gates": [],
+    "coupling_map_checked": true,
+    "coupling_map_ok": true,
+    "num_coupling_violations": 0,
+    "coupling_violations": []
+  },
+  "section_analysis": {
+    "sections": [
+      {
+        "section": "initial_conditions",
+        "num_1q_ops": 44,
+        "num_2q_ops": 15,
+        "depth": 33,
+        "size": 59,
+        "critical_path_time_s": 3e-06,
+        "serial_time_s": 3.3250000000000004e-06,
+        "op_counts": {
+          "rz": 31,
+          "cx": 15,
+          "sx": 10,
+          "x": 3
+        }
+      },
+      {
+        "section": "algorithm_step_1",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 23682,
+        "depth": 28271,
+        "size": 43258,
+        "critical_path_time_s": 0.0038517500000004416,
+        "serial_time_s": 0.0048293500000000005,
+        "op_counts": {
+          "cx": 23682,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_2",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 21888,
+        "depth": 26632,
+        "size": 41464,
+        "critical_path_time_s": 0.0035709250000002996,
+        "serial_time_s": 0.00447055,
+        "op_counts": {
+          "cx": 21888,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_3",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 21984,
+        "depth": 26953,
+        "size": 41560,
+        "critical_path_time_s": 0.0036291000000003228,
+        "serial_time_s": 0.004489750000000001,
+        "op_counts": {
+          "cx": 21984,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_4",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 22215,
+        "depth": 27463,
+        "size": 41791,
+        "critical_path_time_s": 0.00368932500000035,
+        "serial_time_s": 0.00453595,
+        "op_counts": {
+          "cx": 22215,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_5",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 22470,
+        "depth": 27250,
+        "size": 42046,
+        "critical_path_time_s": 0.003707775000000378,
+        "serial_time_s": 0.00458695,
+        "op_counts": {
+          "cx": 22470,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_6",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 21417,
+        "depth": 26538,
+        "size": 40993,
+        "critical_path_time_s": 0.003552250000000283,
+        "serial_time_s": 0.00437635,
+        "op_counts": {
+          "cx": 21417,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_7",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 22335,
+        "depth": 26988,
+        "size": 41911,
+        "critical_path_time_s": 0.003644500000000338,
+        "serial_time_s": 0.00455995,
+        "op_counts": {
+          "cx": 22335,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_8",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 22380,
+        "depth": 27089,
+        "size": 41956,
+        "critical_path_time_s": 0.0036621250000003426,
+        "serial_time_s": 0.0045689500000000004,
+        "op_counts": {
+          "cx": 22380,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_9",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 22047,
+        "depth": 26982,
+        "size": 41623,
+        "critical_path_time_s": 0.003619125000000316,
+        "serial_time_s": 0.0045023500000000004,
+        "op_counts": {
+          "cx": 22047,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "algorithm_step_10",
+        "num_1q_ops": 19576,
+        "num_2q_ops": 22023,
+        "depth": 26841,
+        "size": 41599,
+        "critical_path_time_s": 0.0036140750000003214,
+        "serial_time_s": 0.00449755,
+        "op_counts": {
+          "cx": 22023,
+          "rz": 15858,
+          "sx": 2920,
+          "x": 798
+        }
+      },
+      {
+        "section": "postprocessing",
+        "num_1q_ops": 0,
+        "num_2q_ops": 0,
+        "depth": 0,
+        "size": 0,
+        "critical_path_time_s": 0.0,
+        "serial_time_s": 0.0,
+        "op_counts": {}
+      },
+      {
+        "section": "measurement",
+        "num_1q_ops": 0,
+        "num_2q_ops": 0,
+        "depth": 1,
+        "size": 5,
+        "critical_path_time_s": 1e-06,
+        "serial_time_s": 4.9999999999999996e-06,
+        "op_counts": {
+          "measure": 5
+        }
+      }
+    ],
+    "max_critical_path_time_section": {
+      "section": "algorithm_step_1",
+      "num_1q_ops": 19576,
+      "num_2q_ops": 23682,
+      "depth": 28271,
+      "size": 43258,
+      "critical_path_time_s": 0.0038517500000004416,
+      "serial_time_s": 0.0048293500000000005,
+      "op_counts": {
+        "cx": 23682,
+        "rz": 15858,
+        "sx": 2920,
+        "x": 798
+      }
+    },
+    "max_two_qubit_gate_section": {
+      "section": "algorithm_step_1",
+      "num_1q_ops": 19576,
+      "num_2q_ops": 23682,
+      "depth": 28271,
+      "size": 43258,
+      "critical_path_time_s": 0.0038517500000004416,
+      "serial_time_s": 0.0048293500000000005,
+      "op_counts": {
+        "cx": 23682,
+        "rz": 15858,
+        "sx": 2920,
+        "x": 798
+      }
+    }
+  },
+  "unoptimized_phase_polynomial_analysis": {
+    "num_blocks": 35857,
+    "total_block_instructions": 379597,
+    "total_phase_instructions": 379597,
+    "total_passthrough_instructions": 0,
+    "total_rz": 158611,
+    "total_cx": 220986,
+    "average_block_instructions": 10.586412694871294,
+    "average_phase_instructions": 10.586412694871294,
+    "average_active_qubits": 3.106562177538556,
+    "largest_block": {
+      "start": 305055,
+      "end": 305173,
+      "instruction_count": 119,
+      "phase_instruction_count": 119,
+      "passthrough_instruction_count": 0,
+      "active_qubits": [
+        1,
+        2,
+        3,
+        4,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "active_qubit_count": 9,
+      "rz_count": 30,
+      "cx_count": 89
+    },
+    "section_analysis": {
+      "sections": [
+        {
+          "num_blocks": 14,
+          "total_block_instructions": 46,
+          "total_phase_instructions": 46,
+          "total_passthrough_instructions": 0,
+          "total_rz": 31,
+          "total_cx": 15,
+          "average_block_instructions": 3.2857142857142856,
+          "average_phase_instructions": 3.2857142857142856,
+          "average_active_qubits": 1.7857142857142858,
+          "largest_block": {
+            "start": 33,
+            "end": 40,
+            "instruction_count": 8,
+            "phase_instruction_count": 8,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              5,
+              6,
+              7
+            ],
+            "active_qubit_count": 3,
+            "rz_count": 4,
+            "cx_count": 4
+          },
+          "section": "initial_conditions"
+        },
+        {
+          "num_blocks": 3589,
+          "total_block_instructions": 39540,
+          "total_phase_instructions": 39540,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 23682,
+          "average_block_instructions": 11.01699637782112,
+          "average_phase_instructions": 11.01699637782112,
+          "average_active_qubits": 3.1326274728336583,
+          "largest_block": {
+            "start": 15452,
+            "end": 15561,
+            "instruction_count": 110,
+            "phase_instruction_count": 110,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ],
+            "active_qubit_count": 6,
+            "rz_count": 31,
+            "cx_count": 79
+          },
+          "section": "algorithm_step_1"
+        },
+        {
+          "num_blocks": 3578,
+          "total_block_instructions": 37746,
+          "total_phase_instructions": 37746,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 21888,
+          "average_block_instructions": 10.549468977082169,
+          "average_phase_instructions": 10.549468977082169,
+          "average_active_qubits": 3.1179429849077698,
+          "largest_block": {
+            "start": 19558,
+            "end": 19670,
+            "instruction_count": 113,
+            "phase_instruction_count": 113,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              3,
+              4,
+              5,
+              6,
+              14,
+              15
+            ],
+            "active_qubit_count": 6,
+            "rz_count": 30,
+            "cx_count": 83
+          },
+          "section": "algorithm_step_2"
+        },
+        {
+          "num_blocks": 3579,
+          "total_block_instructions": 37842,
+          "total_phase_instructions": 37842,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 21984,
+          "average_block_instructions": 10.573344509639565,
+          "average_phase_instructions": 10.573344509639565,
+          "average_active_qubits": 3.1234981838502374,
+          "largest_block": {
+            "start": 16187,
+            "end": 16308,
+            "instruction_count": 122,
+            "phase_instruction_count": 122,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              3,
+              4,
+              5,
+              12,
+              13,
+              14,
+              15,
+              16
+            ],
+            "active_qubit_count": 8,
+            "rz_count": 30,
+            "cx_count": 92
+          },
+          "section": "algorithm_step_3"
+        },
+        {
+          "num_blocks": 3589,
+          "total_block_instructions": 38073,
+          "total_phase_instructions": 38073,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 22215,
+          "average_block_instructions": 10.608247422680412,
+          "average_phase_instructions": 10.608247422680412,
+          "average_active_qubits": 3.1019782669267206,
+          "largest_block": {
+            "start": 20122,
+            "end": 20227,
+            "instruction_count": 106,
+            "phase_instruction_count": 106,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              2,
+              3,
+              4,
+              5,
+              13,
+              14,
+              15,
+              16
+            ],
+            "active_qubit_count": 8,
+            "rz_count": 29,
+            "cx_count": 77
+          },
+          "section": "algorithm_step_4"
+        },
+        {
+          "num_blocks": 3586,
+          "total_block_instructions": 38328,
+          "total_phase_instructions": 38328,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 22470,
+          "average_block_instructions": 10.688232013385388,
+          "average_phase_instructions": 10.688232013385388,
+          "average_active_qubits": 3.1037367540435024,
+          "largest_block": {
+            "start": 14431,
+            "end": 14534,
+            "instruction_count": 104,
+            "phase_instruction_count": 104,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              3,
+              4,
+              5,
+              6,
+              14
+            ],
+            "active_qubit_count": 5,
+            "rz_count": 30,
+            "cx_count": 74
+          },
+          "section": "algorithm_step_5"
+        },
+        {
+          "num_blocks": 3591,
+          "total_block_instructions": 37276,
+          "total_phase_instructions": 37275,
+          "total_passthrough_instructions": 1,
+          "total_rz": 15858,
+          "total_cx": 21417,
+          "average_block_instructions": 10.380395433027012,
+          "average_phase_instructions": 10.380116959064328,
+          "average_active_qubits": 3.0804789752158173,
+          "largest_block": {
+            "start": 12971,
+            "end": 13081,
+            "instruction_count": 111,
+            "phase_instruction_count": 111,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              1,
+              2,
+              3,
+              4,
+              13,
+              14,
+              15,
+              16
+            ],
+            "active_qubit_count": 8,
+            "rz_count": 30,
+            "cx_count": 81
+          },
+          "section": "algorithm_step_6"
+        },
+        {
+          "num_blocks": 3578,
+          "total_block_instructions": 38193,
+          "total_phase_instructions": 38193,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 22335,
+          "average_block_instructions": 10.674399105645612,
+          "average_phase_instructions": 10.674399105645612,
+          "average_active_qubits": 3.122694242593628,
+          "largest_block": {
+            "start": 13897,
+            "end": 14006,
+            "instruction_count": 110,
+            "phase_instruction_count": 110,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              3,
+              4,
+              5,
+              6,
+              13,
+              14,
+              15,
+              16,
+              17
+            ],
+            "active_qubit_count": 9,
+            "rz_count": 30,
+            "cx_count": 80
+          },
+          "section": "algorithm_step_7"
+        },
+        {
+          "num_blocks": 3583,
+          "total_block_instructions": 38238,
+          "total_phase_instructions": 38238,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 22380,
+          "average_block_instructions": 10.672062517443484,
+          "average_phase_instructions": 10.672062517443484,
+          "average_active_qubits": 3.118894780909852,
+          "largest_block": {
+            "start": 21466,
+            "end": 21582,
+            "instruction_count": 117,
+            "phase_instruction_count": 117,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              3,
+              4,
+              5,
+              6,
+              14,
+              15,
+              16,
+              17
+            ],
+            "active_qubit_count": 8,
+            "rz_count": 30,
+            "cx_count": 87
+          },
+          "section": "algorithm_step_8"
+        },
+        {
+          "num_blocks": 3587,
+          "total_block_instructions": 37905,
+          "total_phase_instructions": 37905,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 22047,
+          "average_block_instructions": 10.56732645664901,
+          "average_phase_instructions": 10.56732645664901,
+          "average_active_qubits": 3.0841929188737107,
+          "largest_block": {
+            "start": 13297,
+            "end": 13419,
+            "instruction_count": 123,
+            "phase_instruction_count": 123,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              17
+            ],
+            "active_qubit_count": 7,
+            "rz_count": 29,
+            "cx_count": 94
+          },
+          "section": "algorithm_step_9"
+        },
+        {
+          "num_blocks": 3587,
+          "total_block_instructions": 37881,
+          "total_phase_instructions": 37881,
+          "total_passthrough_instructions": 0,
+          "total_rz": 15858,
+          "total_cx": 22023,
+          "average_block_instructions": 10.560635628659046,
+          "average_phase_instructions": 10.560635628659046,
+          "average_active_qubits": 3.1053805408419293,
+          "largest_block": {
+            "start": 14192,
+            "end": 14294,
+            "instruction_count": 103,
+            "phase_instruction_count": 103,
+            "passthrough_instruction_count": 0,
+            "active_qubits": [
+              2,
+              3,
+              4,
+              5,
+              13,
+              14,
+              15,
+              16
+            ],
+            "active_qubit_count": 8,
+            "rz_count": 29,
+            "cx_count": 74
+          },
+          "section": "algorithm_step_10"
+        },
+        {
+          "num_blocks": 0,
+          "total_block_instructions": 0,
+          "total_phase_instructions": 0,
+          "total_passthrough_instructions": 0,
+          "total_rz": 0,
+          "total_cx": 0,
+          "average_block_instructions": 0.0,
+          "average_phase_instructions": 0.0,
+          "average_active_qubits": 0.0,
+          "largest_block": null,
+          "section": "postprocessing"
+        },
+        {
+          "num_blocks": 0,
+          "total_block_instructions": 0,
+          "total_phase_instructions": 0,
+          "total_passthrough_instructions": 0,
+          "total_rz": 0,
+          "total_cx": 0,
+          "average_block_instructions": 0.0,
+          "average_phase_instructions": 0.0,
+          "average_active_qubits": 0.0,
+          "largest_block": null,
+          "section": "measurement"
+        }
+      ],
+      "max_block_count_section": {
+        "num_blocks": 3591,
+        "total_block_instructions": 37276,
+        "total_phase_instructions": 37275,
+        "total_passthrough_instructions": 1,
+        "total_rz": 15858,
+        "total_cx": 21417,
+        "average_block_instructions": 10.380395433027012,
+        "average_phase_instructions": 10.380116959064328,
+        "average_active_qubits": 3.0804789752158173,
+        "largest_block": {
+          "start": 12971,
+          "end": 13081,
+          "instruction_count": 111,
+          "phase_instruction_count": 111,
+          "passthrough_instruction_count": 0,
+          "active_qubits": [
+            1,
+            2,
+            3,
+            4,
+            13,
+            14,
+            15,
+            16
+          ],
+          "active_qubit_count": 8,
+          "rz_count": 30,
+          "cx_count": 81
+        },
+        "section": "algorithm_step_6"
+      },
+      "max_total_phase_instruction_section": {
+        "num_blocks": 3589,
+        "total_block_instructions": 39540,
+        "total_phase_instructions": 39540,
+        "total_passthrough_instructions": 0,
+        "total_rz": 15858,
+        "total_cx": 23682,
+        "average_block_instructions": 11.01699637782112,
+        "average_phase_instructions": 11.01699637782112,
+        "average_active_qubits": 3.1326274728336583,
+        "largest_block": {
+          "start": 15452,
+          "end": 15561,
+          "instruction_count": 110,
+          "phase_instruction_count": 110,
+          "passthrough_instruction_count": 0,
+          "active_qubits": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "active_qubit_count": 6,
+          "rz_count": 31,
+          "cx_count": 79
+        },
+        "section": "algorithm_step_1"
+      },
+      "max_largest_block_section": {
+        "num_blocks": 3587,
+        "total_block_instructions": 37905,
+        "total_phase_instructions": 37905,
+        "total_passthrough_instructions": 0,
+        "total_rz": 15858,
+        "total_cx": 22047,
+        "average_block_instructions": 10.56732645664901,
+        "average_phase_instructions": 10.56732645664901,
+        "average_active_qubits": 3.0841929188737107,
+        "largest_block": {
+          "start": 13297,
+          "end": 13419,
+          "instruction_count": 123,
+          "phase_instruction_count": 123,
+          "passthrough_instruction_count": 0,
+          "active_qubits": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            17
+          ],
+          "active_qubit_count": 7,
+          "rz_count": 29,
+          "cx_count": 94
+        },
+        "section": "algorithm_step_9"
+      }
+    }
+  },
+  "optimized_phase_polynomial_analysis": {
+    "num_blocks": 35854,
+    "total_block_instructions": 346748,
+    "total_phase_instructions": 346748,
+    "total_passthrough_instructions": 0,
+    "total_rz": 136699,
+    "total_cx": 210049,
+    "average_block_instructions": 9.671110615273053,
+    "average_phase_instructions": 9.671110615273053,
+    "average_active_qubits": 3.0964188096167793,
+    "largest_block": {
+      "start": 280641,
+      "end": 280759,
+      "instruction_count": 119,
+      "phase_instruction_count": 119,
+      "passthrough_instruction_count": 0,
+      "active_qubits": [
+        1,
+        2,
+        3,
+        4,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "active_qubit_count": 9,
+      "rz_count": 30,
+      "cx_count": 89
+    }
+  },
+  "optimizer_report": {
+    "circuit_num_qubits": 105,
+    "num_blocks": 35857,
+    "total_original_cx": 220986,
+    "total_candidate_cx": 482160,
+    "total_final_cx": 210049,
+    "cx_delta_vs_original": -10937,
+    "num_blocks_kept_original": 23579,
+    "num_disconnected_blocks": 1050,
+    "residual_methods": {
+      "steiner_gauss:reverse": 28163,
+      "skipped_disconnected": 1050,
+      "graph_exact_fallback": 3367,
+      "steiner_gauss:non_cutting_low_degree": 184,
+      "steiner_gauss:natural": 2319,
+      "steiner_gauss:non_cutting_high_index": 17,
+      "steiner_gauss:dfs_postorder_non_cutting": 206,
+      "steiner_gauss:degree_ascending": 551
+    },
+    "residual_cx_by_method": {
+      "steiner_gauss:reverse": 99456,
+      "skipped_disconnected": 0,
+      "graph_exact_fallback": 213538,
+      "steiner_gauss:non_cutting_low_degree": 3148,
+      "steiner_gauss:natural": 37025,
+      "steiner_gauss:non_cutting_high_index": 517,
+      "steiner_gauss:dfs_postorder_non_cutting": 3262,
+      "steiner_gauss:degree_ascending": 8371
+    }
+  },
+  "counts_comparison": {
+    "match": true,
+    "max_probability_delta": 0.0,
+    "total_variation_distance": 0.0,
+    "tolerance": 0.05,
+    "num_reference_keys": 18,
+    "num_candidate_keys": 18,
+    "deltas": {
+      "00000": 0.0,
+      "00001": 0.0,
+      "00010": 0.0,
+      "00110": 0.0,
+      "00111": 0.0,
+      "01000": 0.0,
+      "01001": 0.0,
+      "01010": 0.0,
+      "01110": 0.0,
+      "01111": 0.0,
+      "10000": 0.0,
+      "10010": 0.0,
+      "10011": 0.0,
+      "10100": 0.0,
+      "11000": 0.0,
+      "11010": 0.0,
+      "11011": 0.0,
+      "11100": 0.0
+    }
+  }
+}
