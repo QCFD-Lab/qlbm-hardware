@@ -40,7 +40,6 @@ from qlbm.lattice import ABLattice
 
 
 NUM_SHOTS = 2**12
-NUM_STEPS = 10
 OPTIMIZATION_LEVEL = 0
 SEED_TRANSPILER = 42
 SEED_SIMULATOR = 42
@@ -315,9 +314,9 @@ def resolve_output_paths(
 
 
 def run_phase_poly_harness(
-    hardware_name: str = "superconducting_google_willow_2024",
+    hardware_name: str,
     optimizer_name: str = "architecture_aware",
-    num_steps: int = NUM_STEPS,
+    num_steps: int = 1,
     num_shots: int = NUM_SHOTS,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     output_file_path_base: Optional[Path] = None,
@@ -420,7 +419,7 @@ def main() -> None:
     # Edit these values for benchmark/simulation runs.
     hardware_name = "superconducting_google_willow_2024"
     optimizer_name = "architecture_aware"
-    num_steps = NUM_STEPS
+    num_steps = 1
     num_shots = NUM_SHOTS
     output_root = DEFAULT_OUTPUT_ROOT
     config_path = None
