@@ -7,7 +7,7 @@ import networkx as nx
 from qiskit import QuantumCircuit
 from qiskit.transpiler import CouplingMap
 
-from .architecture_aware_phasepoly_optimizer import (
+from .tools_for_optimization import (
     BitVec,
     BlockOptimizationReport,
     OptimizationRunReport,
@@ -334,6 +334,3 @@ class A2APhasePoly:
             block_reports=block_reports,
         )
         return out
-
-
-AllToAllPhasePolyOptimizer = A2APhasePoly

@@ -27,7 +27,7 @@ for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
         sys.path.insert(0, str(path))
 
 from components.phase_poly_optimizer import (
-    AllToAllPhasePolyOptimizer,
+    A2APhasePoly,
     ArchitectureAwarePhasePolyOptimizer,
 )
 from components.resource_estimator import QLBMResourceEstimator
@@ -158,7 +158,7 @@ def optimize_circuit_with_phase_poly(
     if optimizer_name == "architecture_aware":
         optimizer = ArchitectureAwarePhasePolyOptimizer()
     elif optimizer_name in {"all_to_all", "a2a"}:
-        optimizer = AllToAllPhasePolyOptimizer()
+        optimizer = A2APhasePoly()
     else:
         raise ValueError(
             "optimizer_name must be one of: architecture_aware, all_to_all"
