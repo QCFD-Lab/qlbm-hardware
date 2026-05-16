@@ -280,7 +280,9 @@ class A2APhasePoly:
                 num_blocks=1,
                 block_reports=[report],
             )
-            return optimized
+            out = _new_like_circuit(source)
+            _append_compact_circuit(out, optimized, list(range(source.num_qubits)))
+            return out
 
         blocks = find_phase_polynomial_blocks(
             source,
