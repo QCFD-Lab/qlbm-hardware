@@ -26,7 +26,10 @@ for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from components.phase_poly_optimizer import ArchitectureAwarePhasePolyOptimizer
+from components.phase_poly_optimizer import (
+    AllToAllPhasePolyOptimizer,
+    ArchitectureAwarePhasePolyOptimizer,
+)
 from components.resource_estimator import QLBMResourceEstimator
 from components.resource_estimator.benchmark_qlbm_resources_v2 import (
     build_full_logical_circuit,
@@ -137,9 +140,30 @@ def run_logical_resource_estimation(
 def optimize_physical_circuit(
     circuit: QuantumCircuit,
     coupling_map: CouplingMap,
-) -> tuple[QuantumCircuit, ArchitectureAwarePhasePolyOptimizer]:
+) -> tuple[QuantumCircuit, Any]:
     """Run the default architecture-aware phase-polynomial optimizer."""
-    optimizer = ArchitectureAwarePhasePolyOptimizer()
+    return optimize_circuit_with_phase_poly(
+        circuit,
+        coupling_map,
+        optimizer_name="architecture_aware",
+    )
+
+
+def optimize_circuit_with_phase_poly(
+    circuit: QuantumCircuit,
+    coupling_map: CouplingMap,
+    optimizer_name: str = "architecture_aware",
+) -> tuple[QuantumCircuit, Any]:
+    """Run a selected phase-polynomial optimizer."""
+    if optimizer_name == "architecture_aware":
+        optimizer = ArchitectureAwarePhasePolyOptimizer()
+    elif optimizer_name in {"all_to_all", "a2a"}:
+        optimizer = AllToAllPhasePolyOptimizer()
+    else:
+        raise ValueError(
+            "optimizer_name must be one of: architecture_aware, all_to_all"
+        )
+
     optimized_circuit = optimizer.optimize(
         circuit=circuit.copy(),
         coupling_map=coupling_map,
@@ -292,6 +316,7 @@ def resolve_output_paths(
 
 def run_phase_poly_harness(
     hardware_name: str = "superconducting_google_willow_2024",
+    optimizer_name: str = "architecture_aware",
     num_steps: int = NUM_STEPS,
     num_shots: int = NUM_SHOTS,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
@@ -306,8 +331,13 @@ def run_phase_poly_harness(
     hardware_config = hardware_configs[hardware_name]
     estimator = QLBMResourceEstimator(hardware_config)
     case = build_ab_8x4_case(num_steps)
+    output_case_label = (
+        case["label"]
+        if optimizer_name == "architecture_aware"
+        else f"{case['label']}-{optimizer_name}"
+    )
     output_file_path_base, output_file_path_optimized = resolve_output_paths(
-        case["label"],
+        output_case_label,
         output_root,
         output_file_path_base,
         output_file_path_optimized,
@@ -319,18 +349,20 @@ def run_phase_poly_harness(
     require_compatible(unoptimized_report, "Unoptimized")
 
     physical_circuit = unoptimized_report["transpiled_circuit"]
-    optimized_circuit, optimizer = optimize_physical_circuit(
+    optimized_circuit, optimizer = optimize_circuit_with_phase_poly(
         physical_circuit,
         CouplingMap(estimator.coupling_map),
+        optimizer_name=optimizer_name,
     )
     optimized_report = estimator.estimate_pretranspiled(
         optimized_circuit,
-        label=f"{case['label']}-phasepoly-optimized",
+        label=f"{output_case_label}-phasepoly-optimized",
         qlbm_metadata=case["metadata"],
         logical_metrics=unoptimized_report["logical"],
         phase_polynomial_analysis=True,
     )
-    require_compatible(optimized_report, "Optimized")
+    if optimizer_name == "architecture_aware":
+        require_compatible(optimized_report, "Optimized")
 
     unoptimized_counts = run_final_counts_simulation(
         unoptimized_report["transpiled_compact_circuit"],
@@ -355,6 +387,7 @@ def run_phase_poly_harness(
     summary = {
         "case": case["label"],
         "hardware": hardware_name,
+        "optimizer_name": optimizer_name,
         "num_steps": num_steps,
         "num_shots": num_shots,
         "output_file_path_base": str(output_file_path_base),
@@ -386,6 +419,7 @@ def run_phase_poly_harness(
 def main() -> None:
     # Edit these values for benchmark/simulation runs.
     hardware_name = "superconducting_google_willow_2024"
+    optimizer_name = "architecture_aware"
     num_steps = NUM_STEPS
     num_shots = NUM_SHOTS
     output_root = DEFAULT_OUTPUT_ROOT
@@ -393,6 +427,7 @@ def main() -> None:
 
     summary = run_phase_poly_harness(
         hardware_name=hardware_name,
+        optimizer_name=optimizer_name,
         num_steps=num_steps,
         num_shots=num_shots,
         output_root=output_root,
