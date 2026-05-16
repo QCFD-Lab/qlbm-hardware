@@ -156,7 +156,7 @@ def optimize_circuit_with_phase_poly(
     """Run a selected phase-polynomial optimizer."""
     if optimizer_name == "architecture_aware":
         optimizer = ArchitectureAwarePhasePolyOptimizer()
-    elif optimizer_name in {"all_to_all", "a2a"}:
+    elif optimizer_name in {"all_to_all"}:
         optimizer = A2APhasePoly()
     else:
         raise ValueError(
@@ -416,9 +416,8 @@ def run_phase_poly_harness(
 
 
 def main() -> None:
-    # Edit these values for benchmark/simulation runs.
     hardware_name = "superconducting_google_willow_2024"
-    optimizer_name = "architecture_aware"
+    optimizer_name = "architecture_aware" # CHOOSE BETWEEN architecture_aware AND all_to_all
     num_steps = 1
     num_shots = NUM_SHOTS
     output_root = DEFAULT_OUTPUT_ROOT
