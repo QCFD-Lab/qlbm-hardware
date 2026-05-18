@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -42,6 +43,34 @@ def write_run_metadata(output_dir: Path, metadata: dict) -> None:
         json.dump(metadata, file, indent=2, sort_keys=True)
 
 
+def build_run_metadata(
+    algorithm_name: str,
+    case_label: str,
+    num_timesteps: int,
+    runner_steps: int,
+    num_shots: int,
+    optimization_level: int,
+    noise_kind: str,
+    backend_method: str,
+    noise_parameters: dict,
+) -> dict:
+    """Build metadata, omitting noise probabilities for noiseless runs."""
+
+    metadata = {
+        "algorithm_name": algorithm_name,
+        "case_label": case_label,
+        "num_timesteps": num_timesteps,
+        "runner_steps": runner_steps,
+        "num_shots": num_shots,
+        "optimization_level": optimization_level,
+        "noise_kind": noise_kind,
+        "backend_method": backend_method,
+    }
+    if noise_kind != "none":
+        metadata["noise_parameters"] = noise_parameters
+    return metadata
+
+
 def main() -> None:
     # Edit these variables for each experiment.
     algorithm_name = "abqlbm"  # Options: "abqlbm", "msqlbm", "spacetime"
@@ -50,7 +79,7 @@ def main() -> None:
     optimization_level = 0
     backend_method = "statevector"
 
-    noise_kind = "depolarizing"  # none, depolarizing, amplitude_damping, phase_damping, gate_error
+    noise_kind = "amplitude_damping"  # none, depolarizing, amplitude_damping, phase_damping, gate_error
     noise_parameters = {
         "single_qubit_probability": 0.001,
         "two_qubit_probability": 0.001,
@@ -78,17 +107,17 @@ def main() -> None:
     output_dir = output_root / f"{case.label}_{noise_kind}_shots{num_shots}"
     write_run_metadata(
         output_dir,
-        {
-            "algorithm_name": algorithm_name,
-            "case_label": case.label,
-            "num_timesteps": num_timesteps,
-            "runner_steps": case.runner_steps,
-            "num_shots": num_shots,
-            "optimization_level": optimization_level,
-            "noise_kind": noise_kind,
-            "backend_method": backend_method,
-            "noise_parameters": noise_parameters,
-        },
+        build_run_metadata(
+            algorithm_name=algorithm_name,
+            case_label=case.label,
+            num_timesteps=num_timesteps,
+            runner_steps=case.runner_steps,
+            num_shots=num_shots,
+            optimization_level=optimization_level,
+            noise_kind=noise_kind,
+            backend_method=backend_method,
+            noise_parameters=noise_parameters,
+        ),
     )
 
     runner = create_qiskit_runner(case)
@@ -105,5 +134,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     main()
-
+    print("--- %s seconds ---" % (time.time() - start_time))

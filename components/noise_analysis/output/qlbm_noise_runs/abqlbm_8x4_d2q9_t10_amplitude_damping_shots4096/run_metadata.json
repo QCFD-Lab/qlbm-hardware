@@ -2,7 +2,7 @@
   "algorithm_name": "abqlbm",
   "backend_method": "statevector",
   "case_label": "abqlbm_8x4_d2q9_t10",
-  "noise_kind": "depolarizing",
+  "noise_kind": "amplitude_damping",
   "noise_parameters": {
     "damping_probability": 0.001,
     "gate_error_probability": 0.001,

@@ -3,13 +3,13 @@
   <ImageData WholeExtent="0 7 0 3 0 0" Origin="0 0 0" Spacing="1 1 1" Direction="1 0 0 0 1 0 0 0 1">
     <Piece Extent="0 7 0 3 0 0"                                                       >
       <PointData Scalars="Scalars_">
-        <DataArray type="Float32" Name="Scalars_" format="appended" RangeMin="100"                  RangeMax="147"                  offset="0"                   />
+        <DataArray type="Float32" Name="Scalars_" format="appended" RangeMin="94"                   RangeMax="163"                  offset="0"                   />
       </PointData>
       <CellData>
       </CellData>
     </Piece>
   </ImageData>
   <AppendedData encoding="base64">
-   _AQAAAACAAACAAAAAVAAAAA==eJwtzDkKgFAMRdEnzqJYuKO4eRfgAizFQqxExMIbfopDBpIndbNUoMVt0omc/qGO1AkVXksG+ho9Nkt3H8rYecaKAwuyyPafi7mJG8/a7Qdu3xfF
+   _AQAAAACAAACAAAAAUgAAAA==eJxjYBB1ZmBQBuJ/TgwMx4D4ERA/AOJ3QMwPFJcGYi4g5gDiD1DxC0AM0qcAxLxQeZB+kPwVID4BxL+AmBmqBiTP5wwRA8ntgZrzwwkADlYZVA==
   </AppendedData>
 </VTKFile>
