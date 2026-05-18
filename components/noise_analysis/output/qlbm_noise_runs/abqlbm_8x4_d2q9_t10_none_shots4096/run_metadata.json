@@ -1,0 +1,17 @@
+{
+  "algorithm_name": "abqlbm",
+  "backend_method": "statevector",
+  "case_label": "abqlbm_8x4_d2q9_t10",
+  "noise_kind": "none",
+  "noise_parameters": {
+    "damping_probability": 0.001,
+    "gate_error_probability": 0.001,
+    "phase_probability": 0.001,
+    "single_qubit_probability": 0.4,
+    "two_qubit_probability": 0.5
+  },
+  "num_shots": 4096,
+  "num_timesteps": 10,
+  "optimization_level": 0,
+  "runner_steps": 10
+}
