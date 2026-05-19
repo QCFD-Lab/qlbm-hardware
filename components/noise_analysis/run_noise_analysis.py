@@ -51,7 +51,8 @@ def build_backend(
     noise_model = build_noise_model(
         kind=noise_kind,
         hardware_config=hardware_config,
-        **noise_parameters,
+        single_qubit_probability=noise_parameters.get("single_qubit_probability", 0.001),
+        two_qubit_probability=noise_parameters.get("two_qubit_probability", 0.01),
     )
     options = {"method": backend_method, "seed_simulator": seed_simulator}
     if noise_model is None:
@@ -89,10 +90,11 @@ def build_run_metadata(
         "noise_kind": noise_kind,
         "backend_method": backend_method,
         "hardware_gate_fidelities": hardware_config.get("gate_fidelities", {}),
+        "hardware_gate_times_s": hardware_config.get("gate_times_s", {}),
         "measurement_fidelity": hardware_config.get("measurement_fidelity"),
         "coherence": hardware_config.get("coherence", {}),
     }
-    if noise_kind not in {"none", "hardware_depolarizing"}:
+    if noise_kind == "depolarizing":
         metadata["noise_parameters"] = noise_parameters
     return metadata
 
@@ -232,21 +234,18 @@ def run_hardware_noise_analysis(
 def main() -> None:
     algorithm_name = "abqlbm"  # Options: "abqlbm", "msqlbm", "spacetime"
     hardware_name = "superconducting_google_willow_2024"
-    max_timesteps = 5
+    max_timesteps = 4
     num_shots = 4096
     optimization_level = 1
     seed_transpiler = 42
     seed_simulator = 42
     backend_method = "statevector"
 
-    # none, depolarizing, amplitude_damping, phase_damping, gate_error, hardware_depolarizing
+    # none, depolarizing, hardware_depolarizing, thermal_relaxation
     noise_kind = "depolarizing"
     noise_parameters = {
         "single_qubit_probability": 0.001,
         "two_qubit_probability": 0.001,
-        "damping_probability": 0.001,
-        "phase_probability": 0.001,
-        "gate_error_probability": 0.001,
     }
 
     output_dir = run_hardware_noise_analysis(

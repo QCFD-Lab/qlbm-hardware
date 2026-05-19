@@ -6,10 +6,8 @@ from typing import Any
 
 from qiskit_aer.noise import (
     NoiseModel,
-    amplitude_damping_error,
     depolarizing_error,
-    pauli_error,
-    phase_damping_error,
+    thermal_relaxation_error,
 )
 
 ONE_QUBIT_GATES = ["id", "x", "y", "z", "sx", "h", "rz"]
@@ -17,10 +15,8 @@ TWO_QUBIT_GATES = ["cx", "cz", "swap", "cp"]
 NOISE_KINDS = {
     "none",
     "depolarizing",
-    "amplitude_damping",
-    "phase_damping",
-    "gate_error",
     "hardware_depolarizing",
+    "thermal_relaxation",
 }
 GATE_ARITIES = {
     "id": 1,
@@ -82,13 +78,73 @@ def build_hardware_depolarizing_noise_model(
     return noise_model
 
 
+def _hardware_t1_t2(hardware_config: dict[str, Any]) -> tuple[float, float]:
+    coherence = hardware_config.get("coherence", {})
+    try:
+        t1 = float(coherence["t1_s"])
+        t2 = float(coherence["t2_s"])
+    except KeyError as exc:
+        raise ValueError(
+            "thermal_relaxation requires coherence.t1_s and coherence.t2_s in hardware_config."
+        ) from exc
+
+    if t1 <= 0:
+        raise ValueError("thermal_relaxation requires t1_s > 0.")
+    if t2 <= 0:
+        raise ValueError("thermal_relaxation requires t2_s > 0.")
+    if t2 > 2 * t1:
+        raise ValueError(
+            "thermal_relaxation requires T2 <= 2*T1; "
+            f"received T1={t1:g}s and T2={t2:g}s."
+        )
+    return t1, t2
+
+
+def build_thermal_relaxation_noise_model(
+    hardware_config: dict[str, Any],
+) -> NoiseModel:
+    """Build thermal relaxation errors from hardware T1/T2 and gate times."""
+
+    t1, t2 = _hardware_t1_t2(hardware_config)
+    basis_gates = [str(gate).lower() for gate in hardware_config.get("basis_gates", [])]
+    gate_times = {
+        str(name).lower(): float(gate_time)
+        for name, gate_time in hardware_config.get("gate_times_s", {}).items()
+    }
+    if not basis_gates:
+        raise ValueError("thermal_relaxation requires basis_gates in hardware_config.")
+    if not gate_times:
+        raise ValueError("thermal_relaxation requires gate_times_s in hardware_config.")
+
+    noise_model = NoiseModel()
+    for gate_name in basis_gates:
+        arity = GATE_ARITIES.get(gate_name)
+        if arity is None:
+            continue
+        if gate_name not in gate_times:
+            raise ValueError(f"thermal_relaxation requires a gate time for {gate_name!r}.")
+        gate_time = gate_times[gate_name]
+        if gate_time < 0:
+            raise ValueError(f"thermal_relaxation gate time for {gate_name!r} must be >= 0.")
+        if gate_time == 0.0:
+            continue
+
+        one_qubit_error = thermal_relaxation_error(t1, t2, gate_time)
+        if arity == 1:
+            quantum_error = one_qubit_error
+        elif arity == 2:
+            quantum_error = one_qubit_error.tensor(one_qubit_error)
+        else:
+            raise ValueError(f"Unsupported arity {arity} for gate {gate_name!r}.")
+
+        noise_model.add_all_qubit_quantum_error(quantum_error, [gate_name])
+    return noise_model
+
+
 def build_noise_model(
     kind: str,
     single_qubit_probability: float = 0.001,
     two_qubit_probability: float = 0.01,
-    damping_probability: float = 0.001,
-    phase_probability: float = 0.001,
-    gate_error_probability: float = 0.001,
     hardware_config: dict[str, Any] | None = None,
 ):
     """Build a Qiskit Aer ``NoiseModel`` or return ``None`` for noiseless runs."""
@@ -104,12 +160,14 @@ def build_noise_model(
             raise ValueError("hardware_depolarizing requires hardware_config.")
         return build_hardware_depolarizing_noise_model(hardware_config)
 
+    if kind == "thermal_relaxation":
+        if hardware_config is None:
+            raise ValueError("thermal_relaxation requires hardware_config.")
+        return build_thermal_relaxation_noise_model(hardware_config)
+
     for name, value in {
         "single_qubit_probability": single_qubit_probability,
         "two_qubit_probability": two_qubit_probability,
-        "damping_probability": damping_probability,
-        "phase_probability": phase_probability,
-        "gate_error_probability": gate_error_probability,
     }.items():
         _validate_probability(name, value)
 
@@ -118,16 +176,6 @@ def build_noise_model(
     if kind == "depolarizing":
         one_qubit = depolarizing_error(single_qubit_probability, 1)
         two_qubit = depolarizing_error(two_qubit_probability, 2)
-    elif kind == "amplitude_damping":
-        one_qubit = amplitude_damping_error(damping_probability)
-        two_qubit = one_qubit.tensor(one_qubit)
-    elif kind == "phase_damping":
-        one_qubit = phase_damping_error(phase_probability)
-        two_qubit = one_qubit.tensor(one_qubit)
-    elif kind == "gate_error":
-        p = gate_error_probability
-        one_qubit = pauli_error([("X", p), ("I", 1 - p)])
-        two_qubit = one_qubit.tensor(one_qubit)
     else:
         raise ValueError(f"Unsupported noise kind {kind!r}.")
 
