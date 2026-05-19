@@ -27,6 +27,10 @@ for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT, Path(__file__).resolve().pare
 from components.resource_estimator import QLBMResourceEstimator
 from noise_models import build_noise_model
 from qlbm_builders import CASE_BUILDERS, QLBMCase, build_full_logical_circuit
+from components.noise_analysis.tools.density_analysis import (
+    analyze_density_counts,
+    save_density_error_growth,
+)
 
 
 DEFAULT_CONFIG_PATH = QLBM_HARDWARE_ROOT / "components" / "resource_estimator" / "config.json"
@@ -73,6 +77,7 @@ def build_run_metadata(
     backend_method: str,
     noise_parameters: dict[str, Any],
     hardware_config: dict[str, Any],
+    simulated_timesteps: list[int] | None = None,
 ) -> dict[str, Any]:
     """Build metadata, omitting manual noise probabilities for noiseless runs."""
 
@@ -82,7 +87,11 @@ def build_run_metadata(
         "hardware_name": hardware_name,
         "hardware_id": hardware_config.get("id"),
         "max_timesteps": max_timesteps,
-        "simulated_timesteps": list(range(0, max_timesteps + 1)),
+        "simulated_timesteps": (
+            simulated_timesteps
+            if simulated_timesteps is not None
+            else list(range(0, max_timesteps + 1))
+        ),
         "num_shots": num_shots,
         "optimization_level": optimization_level,
         "seed_transpiler": seed_transpiler,
@@ -231,10 +240,301 @@ def run_hardware_noise_analysis(
     return output_dir
 
 
+def run_noiseless_vs_noise_density_comparison(
+    algorithm_name: str,
+    hardware_name: str,
+    final_timestep: int,
+    num_shots: int,
+    optimization_level: int,
+    seed_transpiler: int,
+    seed_simulator: int,
+    noise_kind: str,
+    backend_method: str,
+    noise_parameters: dict[str, Any],
+    config_path: Path,
+    output_root: Path,
+    exclude_y_boundary: bool = False,
+) -> Path:
+    """Run only the final timestep for noiseless and noisy cases, then compare rho."""
+
+    if final_timestep < 1:
+        raise ValueError("final_timestep must be at least 1.")
+    if noise_kind == "none":
+        raise ValueError("Choose a non-'none' noise_kind for a baseline-vs-noise comparison.")
+
+    hardware_configs = load_hardware_configs(config_path)
+    if hardware_name not in hardware_configs:
+        raise ValueError(
+            f"Unknown hardware_name={hardware_name!r}. "
+            f"Expected one of {sorted(hardware_configs)}."
+        )
+    if algorithm_name not in CASE_BUILDERS:
+        raise ValueError(
+            f"Unknown algorithm_name={algorithm_name!r}. "
+            f"Expected one of {sorted(CASE_BUILDERS)}."
+        )
+
+    hardware_config = hardware_configs[hardware_name]
+    estimator = QLBMResourceEstimator(hardware_config)
+    case = CASE_BUILDERS[algorithm_name](num_timesteps=final_timestep)
+
+    output_dir = (
+        output_root
+        / "density_comparisons"
+        / f"{case.label}_{hardware_name}_{noise_kind}_vs_none"
+    )
+    baseline_dir = output_dir / "baseline_none"
+    noisy_dir = output_dir / f"noisy_{noise_kind}"
+    analysis_dir = output_dir / "analysis"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logical_circuit = build_full_logical_circuit(case, case.runner_steps)
+    report = estimator.estimate(
+        logical_circuit,
+        label=f"{case.label}_density_comparison",
+        qlbm_metadata={**case.metadata, "simulated_timestep": final_timestep},
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+        transpile_circuit=True,
+        phase_polynomial_analysis=False,
+    )
+    require_compatible(report)
+    transpiled_compact_circuit = report["transpiled_compact_circuit"]
+
+    write_json(
+        output_dir / "comparison_metadata.json",
+        {
+            "analysis_kind": "final_density_profile_comparison",
+            "algorithm_name": algorithm_name,
+            "case_label": case.label,
+            "hardware_name": hardware_name,
+            "hardware_id": hardware_config.get("id"),
+            "final_timestep": final_timestep,
+            "num_shots": num_shots,
+            "optimization_level": optimization_level,
+            "seed_transpiler": seed_transpiler,
+            "seed_simulator": seed_simulator,
+            "backend_method": backend_method,
+            "baseline_noise_kind": "none",
+            "selected_noise_kind": noise_kind,
+            "exclude_y_boundary": exclude_y_boundary,
+            "hardware_gate_fidelities": hardware_config.get("gate_fidelities", {}),
+            "hardware_gate_times_s": hardware_config.get("gate_times_s", {}),
+            "measurement_fidelity": hardware_config.get("measurement_fidelity"),
+            "coherence": hardware_config.get("coherence", {}),
+            "noise_parameters": noise_parameters if noise_kind == "depolarizing" else {},
+        },
+    )
+
+    run_dirs = {
+        "none": baseline_dir,
+        noise_kind: noisy_dir,
+    }
+    run_counts = {}
+    for run_noise_kind, run_dir in run_dirs.items():
+        backend = build_backend(
+            noise_kind=run_noise_kind,
+            backend_method=backend_method,
+            seed_simulator=seed_simulator,
+            noise_parameters=noise_parameters,
+            hardware_config=hardware_config,
+        )
+        qlbm_result = case.lattice.create_result(str(run_dir), "step")
+        qlbm_result.visualize_geometry()
+
+        result_run = backend.run(transpiled_compact_circuit, shots=num_shots).result()
+        counts = dict(result_run.get_counts())
+        run_counts[run_noise_kind] = counts
+        write_json(run_dir / f"counts_step_{final_timestep}.json", counts)
+        write_json(
+            run_dir / "run_metadata.json",
+            build_run_metadata(
+                algorithm_name=algorithm_name,
+                case_label=case.label,
+                hardware_name=hardware_name,
+                max_timesteps=final_timestep,
+                num_shots=num_shots,
+                optimization_level=optimization_level,
+                seed_transpiler=seed_transpiler,
+                seed_simulator=seed_simulator,
+                noise_kind=run_noise_kind,
+                backend_method=backend_method,
+                noise_parameters=noise_parameters,
+                hardware_config=hardware_config,
+                simulated_timesteps=[final_timestep],
+            ),
+        )
+        qlbm_result.save_timestep_counts(counts, final_timestep)
+
+    write_json(output_dir / "resource_report.json", report)
+
+    analyze_density_counts(
+        run_counts["none"],
+        run_counts[noise_kind],
+        case.lattice,
+        analysis_dir,
+        step=final_timestep,
+        baseline_label="noiseless",
+        noisy_label=noise_kind,
+        normalize=True,
+        exclude_y_boundary=exclude_y_boundary,
+    )
+    return output_dir
+
+
+def run_density_error_growth_comparison(
+    algorithm_name: str,
+    hardware_name: str,
+    max_timesteps: int,
+    num_shots: int,
+    optimization_level: int,
+    seed_transpiler: int,
+    seed_simulator: int,
+    noise_kind: str,
+    backend_method: str,
+    noise_parameters: dict[str, Any],
+    config_path: Path,
+    output_root: Path,
+    exclude_y_boundary: bool = False,
+) -> Path:
+    """Compare density errors against noiseless runs for timesteps 1..N."""
+
+    if max_timesteps < 1:
+        raise ValueError("max_timesteps must be at least 1.")
+    if noise_kind == "none":
+        raise ValueError("Choose a non-'none' noise_kind for density-error growth.")
+
+    hardware_configs = load_hardware_configs(config_path)
+    if hardware_name not in hardware_configs:
+        raise ValueError(
+            f"Unknown hardware_name={hardware_name!r}. "
+            f"Expected one of {sorted(hardware_configs)}."
+        )
+    if algorithm_name not in CASE_BUILDERS:
+        raise ValueError(
+            f"Unknown algorithm_name={algorithm_name!r}. "
+            f"Expected one of {sorted(CASE_BUILDERS)}."
+        )
+
+    hardware_config = hardware_configs[hardware_name]
+    estimator = QLBMResourceEstimator(hardware_config)
+    final_case = CASE_BUILDERS[algorithm_name](num_timesteps=max_timesteps)
+    output_dir = (
+        output_root
+        / "density_error_growth"
+        / f"{final_case.label}_{hardware_name}_{noise_kind}_vs_none"
+    )
+    analysis_dir = output_dir / "analysis"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    write_json(
+        output_dir / "comparison_metadata.json",
+        {
+            "analysis_kind": "density_error_growth_from_counts",
+            "algorithm_name": algorithm_name,
+            "case_label": final_case.label,
+            "hardware_name": hardware_name,
+            "hardware_id": hardware_config.get("id"),
+            "max_timesteps": max_timesteps,
+            "simulated_timesteps": list(range(1, max_timesteps + 1)),
+            "num_shots": num_shots,
+            "optimization_level": optimization_level,
+            "seed_transpiler": seed_transpiler,
+            "seed_simulator": seed_simulator,
+            "backend_method": backend_method,
+            "baseline_noise_kind": "none",
+            "selected_noise_kind": noise_kind,
+            "exclude_y_boundary": exclude_y_boundary,
+            "hardware_gate_fidelities": hardware_config.get("gate_fidelities", {}),
+            "hardware_gate_times_s": hardware_config.get("gate_times_s", {}),
+            "measurement_fidelity": hardware_config.get("measurement_fidelity"),
+            "coherence": hardware_config.get("coherence", {}),
+            "noise_parameters": noise_parameters if noise_kind == "depolarizing" else {},
+        },
+    )
+
+    backends = {
+        "none": build_backend(
+            noise_kind="none",
+            backend_method=backend_method,
+            seed_simulator=seed_simulator,
+            noise_parameters=noise_parameters,
+            hardware_config=hardware_config,
+        ),
+        noise_kind: build_backend(
+            noise_kind=noise_kind,
+            backend_method=backend_method,
+            seed_simulator=seed_simulator,
+            noise_parameters=noise_parameters,
+            hardware_config=hardware_config,
+        ),
+    }
+
+    step_metrics = []
+    final_report = None
+    for timestep in range(1, max_timesteps + 1):
+        case = CASE_BUILDERS[algorithm_name](num_timesteps=timestep)
+        logical_circuit = build_full_logical_circuit(case, case.runner_steps)
+        report = estimator.estimate(
+            logical_circuit,
+            label=f"{case.label}_density_growth_step{timestep}",
+            qlbm_metadata={**case.metadata, "simulated_timestep": timestep},
+            optimization_level=optimization_level,
+            seed_transpiler=seed_transpiler,
+            transpile_circuit=True,
+            phase_polynomial_analysis=False,
+        )
+        require_compatible(report)
+        transpiled_compact_circuit = report["transpiled_compact_circuit"]
+
+        baseline_counts = dict(
+            backends["none"].run(transpiled_compact_circuit, shots=num_shots).result().get_counts()
+        )
+        noisy_counts = dict(
+            backends[noise_kind]
+            .run(transpiled_compact_circuit, shots=num_shots)
+            .result()
+            .get_counts()
+        )
+
+        step_dir = analysis_dir / f"step_{timestep:03d}"
+        metrics = analyze_density_counts(
+            baseline_counts,
+            noisy_counts,
+            case.lattice,
+            step_dir,
+            step=timestep,
+            baseline_label="noiseless",
+            noisy_label=noise_kind,
+            normalize=True,
+            exclude_y_boundary=exclude_y_boundary,
+        )
+        step_metrics.append({"timestep": timestep, "metrics": metrics})
+
+        write_json(output_dir / f"counts_none_step_{timestep}.json", baseline_counts)
+        write_json(output_dir / f"counts_{noise_kind}_step_{timestep}.json", noisy_counts)
+
+        if timestep == max_timesteps:
+            final_report = report
+            for run_noise_kind, counts in {
+                "none": baseline_counts,
+                noise_kind: noisy_counts,
+            }.items():
+                final_dir = output_dir / f"final_{run_noise_kind}"
+                qlbm_result = case.lattice.create_result(str(final_dir), "step")
+                qlbm_result.visualize_geometry()
+                qlbm_result.save_timestep_counts(counts, timestep)
+
+    save_density_error_growth(analysis_dir, step_metrics, noisy_label=noise_kind)
+    write_json(output_dir / "density_error_metrics_by_timestep.json", step_metrics)
+    write_json(output_dir / "resource_report.json", final_report)
+    return output_dir
+
+
 def main() -> None:
     algorithm_name = "abqlbm"  # Options: "abqlbm", "msqlbm", "spacetime"
     hardware_name = "superconducting_google_willow_2024"
-    max_timesteps = 4
+    max_timesteps = 7
     num_shots = 4096
     optimization_level = 1
     seed_transpiler = 42
@@ -244,27 +544,63 @@ def main() -> None:
     # none, depolarizing, hardware_depolarizing, thermal_relaxation
     noise_kind = "depolarizing"
     noise_parameters = {
-        "single_qubit_probability": 0.001,
-        "two_qubit_probability": 0.001,
+        "single_qubit_probability": 0.000001,
+        "two_qubit_probability": 0.00001,
     }
+    run_density_comparison = False
+    run_density_error_growth = True
+    exclude_y_boundary = False
 
-    output_dir = run_hardware_noise_analysis(
-        algorithm_name=algorithm_name,
-        hardware_name=hardware_name,
-        max_timesteps=max_timesteps,
-        num_shots=num_shots,
-        optimization_level=optimization_level,
-        seed_transpiler=seed_transpiler,
-        seed_simulator=seed_simulator,
-        noise_kind=noise_kind,
-        backend_method=backend_method,
-        noise_parameters=noise_parameters,
-        config_path=DEFAULT_CONFIG_PATH,
-        output_root=DEFAULT_OUTPUT_ROOT,
-    )
+    if run_density_error_growth:
+        output_dir = run_density_error_growth_comparison(
+            algorithm_name=algorithm_name,
+            hardware_name=hardware_name,
+            max_timesteps=max_timesteps,
+            num_shots=num_shots,
+            optimization_level=optimization_level,
+            seed_transpiler=seed_transpiler,
+            seed_simulator=seed_simulator,
+            noise_kind=noise_kind,
+            backend_method=backend_method,
+            noise_parameters=noise_parameters,
+            config_path=DEFAULT_CONFIG_PATH,
+            output_root=DEFAULT_OUTPUT_ROOT,
+            exclude_y_boundary=exclude_y_boundary,
+        )
+    elif run_density_comparison:
+        output_dir = run_noiseless_vs_noise_density_comparison(
+            algorithm_name=algorithm_name,
+            hardware_name=hardware_name,
+            final_timestep=max_timesteps,
+            num_shots=num_shots,
+            optimization_level=optimization_level,
+            seed_transpiler=seed_transpiler,
+            seed_simulator=seed_simulator,
+            noise_kind=noise_kind,
+            backend_method=backend_method,
+            noise_parameters=noise_parameters,
+            config_path=DEFAULT_CONFIG_PATH,
+            output_root=DEFAULT_OUTPUT_ROOT,
+            exclude_y_boundary=exclude_y_boundary,
+        )
+    else:
+        output_dir = run_hardware_noise_analysis(
+            algorithm_name=algorithm_name,
+            hardware_name=hardware_name,
+            max_timesteps=max_timesteps,
+            num_shots=num_shots,
+            optimization_level=optimization_level,
+            seed_transpiler=seed_transpiler,
+            seed_simulator=seed_simulator,
+            noise_kind=noise_kind,
+            backend_method=backend_method,
+            noise_parameters=noise_parameters,
+            config_path=DEFAULT_CONFIG_PATH,
+            output_root=DEFAULT_OUTPUT_ROOT,
+        )
 
     print(f"QLBM hardware noise-analysis output: {output_dir}")
-    print(f"Paraview files: {output_dir / 'paraview'}")
+    print(f"Analysis files: {output_dir / 'analysis'}")
 
 
 if __name__ == "__main__":
