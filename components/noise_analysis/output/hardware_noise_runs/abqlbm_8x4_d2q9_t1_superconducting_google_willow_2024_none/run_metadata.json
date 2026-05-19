@@ -1,7 +1,7 @@
 {
   "algorithm_name": "abqlbm",
   "backend_method": "statevector",
-  "case_label": "abqlbm_8x4_d2q9_t2",
+  "case_label": "abqlbm_8x4_d2q9_t1",
   "coherence": {
     "t1_s": 6.8e-05,
     "t2_s": 8.9e-05
@@ -14,15 +14,14 @@
   },
   "hardware_id": "google willow 2024",
   "hardware_name": "superconducting_google_willow_2024",
-  "max_timesteps": 2,
+  "max_timesteps": 1,
   "measurement_fidelity": 0.95,
   "noise_kind": "none",
-  "num_shots": 32,
-  "optimization_level": 0,
+  "num_shots": 4096,
+  "optimization_level": 1,
   "seed_simulator": 42,
   "seed_transpiler": 42,
   "simulated_timesteps": [
-    1,
-    2
+    1
   ]
 }

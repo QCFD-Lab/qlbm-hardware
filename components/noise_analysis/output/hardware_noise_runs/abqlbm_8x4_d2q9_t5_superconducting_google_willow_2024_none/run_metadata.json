@@ -16,14 +16,7 @@
   "hardware_name": "superconducting_google_willow_2024",
   "max_timesteps": 5,
   "measurement_fidelity": 0.95,
-  "noise_kind": "depolarizing",
-  "noise_parameters": {
-    "damping_probability": 1e-06,
-    "gate_error_probability": 1e-06,
-    "phase_probability": 1e-06,
-    "single_qubit_probability": 1e-05,
-    "two_qubit_probability": 1e-06
-  },
+  "noise_kind": "none",
   "num_shots": 4096,
   "optimization_level": 1,
   "seed_simulator": 42,

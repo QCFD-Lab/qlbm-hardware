@@ -81,7 +81,7 @@ def build_run_metadata(
         "hardware_name": hardware_name,
         "hardware_id": hardware_config.get("id"),
         "max_timesteps": max_timesteps,
-        "simulated_timesteps": list(range(1, max_timesteps + 1)),
+        "simulated_timesteps": list(range(0, max_timesteps + 1)),
         "num_shots": num_shots,
         "optimization_level": optimization_level,
         "seed_transpiler": seed_transpiler,
@@ -197,11 +197,13 @@ def run_hardware_noise_analysis(
     )
 
     final_report = None
-    for timestep in range(1, max_timesteps + 1):
-        case = CASE_BUILDERS[algorithm_name](num_timesteps=timestep)
+    for timestep in range(0, max_timesteps + 1):
+        case_timesteps = timestep if timestep > 0 else 1
+        case = CASE_BUILDERS[algorithm_name](num_timesteps=case_timesteps)
         qlbm_result = case.lattice.create_result(str(output_dir), "step")
         qlbm_result.visualize_geometry()
-        logical_circuit = build_full_logical_circuit(case, case.runner_steps)
+        logical_steps = case.runner_steps if timestep > 0 else 0
+        logical_circuit = build_full_logical_circuit(case, logical_steps)
         report = estimator.estimate(
             logical_circuit,
             label=f"{case.label}_step{timestep}",
