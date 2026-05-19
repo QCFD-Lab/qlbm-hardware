@@ -84,7 +84,7 @@ def build_full_logical_circuit(case: QLBMCase, num_steps: int) -> QuantumCircuit
     return circuit
 
 
-def build_abqlbm_4x8_0_case(num_timesteps: int) -> QLBMCase:
+def build_abqlbm_4x8_0_case(num_timesteps: int, measure_velocity_qubits: bool = False) -> QLBMCase:
     """Build an ABQLBM circuit for 8x4 D2Q9 no obstacles
     """
 
@@ -97,7 +97,10 @@ def build_abqlbm_4x8_0_case(num_timesteps: int) -> QLBMCase:
     initial_conditions = ABInitialConditions(lattice)
     algorithm = ABQLBM(lattice)
     postprocessing = EmptyPrimitive(lattice)
-    measurement = ABGridMeasurement(lattice)
+    measurement = ABGridMeasurement(
+        lattice,
+        measure_velocity_qubits=measure_velocity_qubits,
+    )
 
     return QLBMCase(
         label=f"abqlbm_8x4_d2q9_t{num_timesteps}",
@@ -113,6 +116,7 @@ def build_abqlbm_4x8_0_case(num_timesteps: int) -> QLBMCase:
         metadata={
             "algorithm": "ABQLBM",
             "lattice": lattice_data,
+            "measure_velocity_qubits": measure_velocity_qubits,
             "num_timesteps": num_timesteps,
         },
     )
