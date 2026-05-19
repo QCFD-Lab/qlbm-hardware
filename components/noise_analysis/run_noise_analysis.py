@@ -413,7 +413,7 @@ def run_density_error_growth_comparison(
     output_root: Path,
     exclude_y_boundary: bool = False,
 ) -> Path:
-    """Compare density errors against noiseless runs for timesteps 0..N."""
+    """Compare density errors against noiseless runs for QLBM timesteps 1..N."""
 
     if max_timesteps < 1:
         raise ValueError("max_timesteps must be at least 1.")
@@ -448,7 +448,7 @@ def run_density_error_growth_comparison(
             "hardware_name": hardware_name,
             "hardware_id": hardware_config.get("id"),
             "max_timesteps": max_timesteps,
-            "simulated_timesteps": list(range(0, max_timesteps + 1)),
+            "simulated_timesteps": list(range(1, max_timesteps + 1)),
             "num_shots": num_shots,
             "optimization_level": optimization_level,
             "seed_transpiler": seed_transpiler,
@@ -484,11 +484,9 @@ def run_density_error_growth_comparison(
 
     step_metrics = []
     final_report = None
-    for timestep in range(0, max_timesteps + 1):
-        case_timesteps = timestep if timestep > 0 else 1
-        case = build_case(algorithm_name, case_timesteps)
-        logical_steps = case.runner_steps if timestep > 0 else 0
-        logical_circuit = build_full_logical_circuit(case, logical_steps)
+    for timestep in range(1, max_timesteps + 1):
+        case = build_case(algorithm_name, timestep)
+        logical_circuit = build_full_logical_circuit(case, case.runner_steps)
         report = estimator.estimate(
             logical_circuit,
             label=f"{case.label}_density_growth_step{timestep}",
