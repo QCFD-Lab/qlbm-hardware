@@ -44,7 +44,7 @@
   },
   "superconducting_ibm_nighthawk_r1_2025": {
     "id": "ibm nighthawk r1 2025",
-    "architecture": "superconducting fixed-frequency transmon",
+    "architecture": "superconducting fixed-frequency transmon with tunable couplers",
     "device_name": "Nighthawk r1",
     "year_reported": 2025,
     "num_qubits": 120,
@@ -64,17 +64,18 @@
       "rz": 0.0,
       "sx": 35e-9,
       "x": 35e-9,
-      "ecr": null
+      "cz": 200e-9,
+      "rx": 35e-9
     },
     "gate_fidelities": {
       "rz": 1.0,
-      "sx": null,
-      "x": null,
-      "rx": null,
-      "cz": null
+      "sx": 0.99975,
+      "x": 0.99975,
+      "rx": 0.99975,
+      "cz": 0.99785
     },
     "measurement_time_s": null,
-    "measurement_fidelity": null,
+    "measurement_fidelity": 0.98022,
     "coherence": {
       "t1_s": null,
       "t2_s": null
