@@ -553,6 +553,37 @@ def test_2d_grid_disabled_qubits_match_declared_topology_size():
     assert validation["warnings"] == []
 
 
+def test_all_to_all_coupling_type_generates_full_topology():
+    estimator = QLBMResourceEstimator(
+        {
+            "num_qubits": 4,
+            "basis_gates": ["h", "cx"],
+            "coupling_type": "all_to_all",
+        }
+    )
+
+    assert len(estimator.coupling_map) == 12
+    assert estimator.validate_hardware_config()["topology_matches_num_qubits"] is True
+
+
+def test_fake_backend_coupling_type_uses_exact_fake_backend_topology():
+    estimator = QLBMResourceEstimator(
+        {
+            "num_qubits": 127,
+            "basis_gates": ["rz", "sx", "x", "cx"],
+            "coupling_type": "fake_backend",
+            "coupling_params": {"backend": "FakeKyoto"},
+        }
+    )
+
+    validation = estimator.validate_hardware_config()
+
+    assert len(estimator.coupling_map) == 144
+    assert validation["topology_num_qubits"] == 127
+    assert validation["topology_matches_num_qubits"] is True
+    assert validation["warnings"] == []
+
+
 def test_time_estimates_serial_critical_path_and_scheduled_duration():
     qc = QuantumCircuit(2)
     qc.h(0)
@@ -625,3 +656,22 @@ def test_missing_hardware_fields_warn_without_failing():
         "Scheduled duration unavailable because gate durations are missing"
         in timing["warnings"]
     )
+
+
+def test_null_gate_times_are_reported_unknown_without_failing():
+    qc = QuantumCircuit(1)
+    qc.rx(0.2, 0)
+
+    estimator = QLBMResourceEstimator(
+        {
+            "num_qubits": 1,
+            "basis_gates": ["rx"],
+            "gate_times_s": {"rx": None},
+        }
+    )
+    timing = estimator.estimate_time(qc)
+
+    assert timing["serial_time_s"] == 0.0
+    assert timing["critical_path_time_s"] == 0.0
+    assert timing["unknown_gate_times"] == ["rx"]
+    assert timing["scheduled_duration_s"] is None

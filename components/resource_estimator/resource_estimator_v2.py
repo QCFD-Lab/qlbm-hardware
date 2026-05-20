@@ -477,7 +477,13 @@ class QLBMResourceEstimator:
         unknown_gates = sorted(
             name
             for name in op_counts
-            if name not in NON_UNITARY_OPS and name not in self.gate_times_s
+            if (
+                name not in NON_UNITARY_OPS
+                and (
+                    name not in self.gate_times_s
+                    or self.gate_times_s.get(name) is None
+                )
+            )
         )
         if unknown_gates:
             warnings.append(f"Missing gate times for: {', '.join(unknown_gates)}")
@@ -606,7 +612,7 @@ class QLBMResourceEstimator:
             if gate_name == "measure":
                 serial_time_s += count * (self.measurement_time_s or 0.0)
             else:
-                serial_time_s += count * self.gate_times_s.get(gate_name, 0.0)
+                serial_time_s += count * (self.gate_times_s.get(gate_name) or 0.0)
         return serial_time_s
 
     def _scheduled_timing(self, circuit: QuantumCircuit) -> Tuple[Optional[float], Optional[float], List[str]]:
@@ -667,6 +673,7 @@ class QLBMResourceEstimator:
         duration_entries = [
             (name, None, duration_s, "s")
             for name, duration_s in self.gate_times_s.items()
+            if duration_s is not None
         ]
         if self.measurement_time_s is not None:
             duration_entries.append(("measure", None, self.measurement_time_s, "s"))
@@ -786,6 +793,19 @@ class QLBMResourceEstimator:
                 int(self.coupling_params.get("cols", 0)),
                 self.coupling_params.get("disabled_qubits", []),
             )
+        if self.coupling_type in {"all_to_all", "fully_connected"}:
+            return self._make_all_to_all_edges(
+                int(
+                    self.coupling_params.get(
+                        "num_qubits",
+                        self.hardware_config.get("num_qubits", 0),
+                    )
+                )
+            )
+        if self.coupling_type in {"fake_backend", "qiskit_fake_backend"}:
+            return self._make_fake_backend_edges(
+                str(self.coupling_params["backend"])
+            )
         return None
 
     @staticmethod
@@ -813,6 +833,61 @@ class QLBMResourceEstimator:
                     if down not in disabled:
                         edges.extend([[qubit, down], [down, qubit]])
         return edges
+
+    @staticmethod
+    def _make_all_to_all_edges(num_qubits: int) -> List[List[int]]:
+        if num_qubits <= 0:
+            return []
+        return [
+            [int(q0), int(q1)]
+            for q0, q1 in CouplingMap.from_full(
+                num_qubits,
+                bidirectional=True,
+            ).get_edges()
+        ]
+
+    @staticmethod
+    def _make_fake_backend_edges(backend_name: str) -> List[List[int]]:
+        """
+        Return the coupling map from an installed Qiskit fake backend.
+
+        This is used for hardware entries where a named backend topology is more
+        accurate than a generic topology generator, for example IBM Kyoto's
+        127-qubit heavy-hex layout.
+        """
+        try:
+            fake_provider = __import__(
+                "qiskit_ibm_runtime.fake_provider",
+                fromlist=[backend_name],
+            )
+            backend_cls = getattr(fake_provider, backend_name)
+        except (ImportError, AttributeError) as exc:
+            raise ValueError(
+                f"Qiskit fake backend {backend_name!r} is not available."
+            ) from exc
+
+        backend = backend_cls()
+        if hasattr(backend, "coupling_map"):
+            coupling_map = backend.coupling_map
+            if coupling_map is not None:
+                edges = (
+                    coupling_map.get_edges()
+                    if hasattr(coupling_map, "get_edges")
+                    else coupling_map
+                )
+                return [[int(q0), int(q1)] for q0, q1 in edges]
+
+        if hasattr(backend, "target"):
+            coupling_map = backend.target.build_coupling_map()
+            return [[int(q0), int(q1)] for q0, q1 in coupling_map.get_edges()]
+
+        if hasattr(backend, "configuration"):
+            return [
+                [int(q0), int(q1)]
+                for q0, q1 in backend.configuration().coupling_map
+            ]
+
+        raise ValueError(f"Qiskit fake backend {backend_name!r} has no coupling map.")
 
     def _topology_num_qubits(self) -> Optional[int]:
         if not self.coupling_map:

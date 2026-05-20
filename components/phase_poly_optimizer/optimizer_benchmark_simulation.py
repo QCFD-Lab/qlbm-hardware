@@ -10,7 +10,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from qiskit import QuantumCircuit
+from qiskit import QuantumCircuit, transpile
 from qiskit.transpiler import CouplingMap
 from qiskit_aer import AerSimulator
 
@@ -44,6 +44,8 @@ OPTIMIZATION_LEVEL = 0
 SEED_TRANSPILER = 42
 SEED_SIMULATOR = 42
 COUNTS_MAX_PROBABILITY_DELTA_TOLERANCE = 0.01
+DEFAULT_MAX_COUNT_SIMULATION_QUBITS = 24
+DEFAULT_PHASE_POLY_INTERMEDIATE_BASIS = ["rz", "sx", "x", "cx"]
 DEFAULT_OUTPUT_ROOT = COMPONENT_DIR / "output"
 
 
@@ -136,6 +138,50 @@ def run_logical_resource_estimation(
     )
 
 
+def representative_two_qubit_gate_time_s(hardware_config: Dict[str, Any]) -> Optional[float]:
+    """Return a representative native two-qubit duration for intermediate CX reports."""
+    gate_times = {
+        str(name).lower(): value
+        for name, value in hardware_config.get("gate_times_s", {}).items()
+    }
+    for gate_name in ("cx", "ecr", "cz", "iswap", "rxx", "ryy", "rzz", "rzx"):
+        if gate_name in gate_times:
+            return gate_times[gate_name]
+    return None
+
+
+def build_phase_poly_intermediate_hardware_config(
+    hardware_config: Dict[str, Any],
+    intermediate_basis_gates: Optional[list[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Build a hardware-shaped config for the CX/RZ phase-polynomial IR.
+
+    The connectivity and qubit capacity are copied from the target hardware, while
+    the basis is changed to a CX-capable intermediate basis. This lets the optimizer
+    work on an architecture-aware CX/RZ representation before the result is compiled
+    back to the true native basis.
+    """
+    basis = [
+        gate.lower()
+        for gate in (intermediate_basis_gates or DEFAULT_PHASE_POLY_INTERMEDIATE_BASIS)
+    ]
+    config = dict(hardware_config)
+    config["id"] = f"{hardware_config.get('id', 'hardware')}-phasepoly-cx-ir"
+    config["basis_gates"] = basis
+
+    gate_times = {
+        str(name).lower(): value
+        for name, value in hardware_config.get("gate_times_s", {}).items()
+    }
+    if "cx" in basis and "cx" not in gate_times:
+        representative_time = representative_two_qubit_gate_time_s(hardware_config)
+        if representative_time is not None:
+            gate_times["cx"] = representative_time
+    config["gate_times_s"] = gate_times
+    return config
+
+
 def optimize_physical_circuit(
     circuit: QuantumCircuit,
     coupling_map: CouplingMap,
@@ -170,6 +216,93 @@ def optimize_circuit_with_phase_poly(
     return optimized_circuit, optimizer
 
 
+def run_intermediate_native_phase_poly_pipeline(
+    circuit: QuantumCircuit,
+    hardware_config: Dict[str, Any],
+    optimizer_name: str = "architecture_aware",
+    intermediate_basis_gates: Optional[list[str]] = None,
+    optimization_level: int = OPTIMIZATION_LEVEL,
+    seed_transpiler: int = SEED_TRANSPILER,
+    qlbm_metadata: Optional[Dict[str, Any]] = None,
+    phase_polynomial_analysis: bool = True,
+) -> Dict[str, Any]:
+    """
+    Optimize in a CX/RZ phase-polynomial IR, then compile to native hardware basis.
+
+    This is the recommended pipeline for hardware configurations whose native
+    entangling gate is not CX. It evaluates whether reducing the intermediate CX
+    structure also reduces final native two-qubit resources.
+    """
+    native_estimator = QLBMResourceEstimator(hardware_config)
+    intermediate_config = build_phase_poly_intermediate_hardware_config(
+        hardware_config,
+        intermediate_basis_gates=intermediate_basis_gates,
+    )
+    intermediate_estimator = QLBMResourceEstimator(intermediate_config)
+
+    baseline_native_report = native_estimator.estimate(
+        circuit,
+        label="baseline-native",
+        qlbm_metadata=qlbm_metadata,
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+        transpile_circuit=True,
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+    if baseline_native_report.get("transpile_error"):
+        raise RuntimeError(baseline_native_report["transpile_error"])
+
+    intermediate_report = intermediate_estimator.estimate(
+        circuit,
+        label="baseline-phasepoly-cx-ir",
+        qlbm_metadata=qlbm_metadata,
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+        transpile_circuit=True,
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+    if intermediate_report.get("transpile_error"):
+        raise RuntimeError(intermediate_report["transpile_error"])
+
+    intermediate_circuit = intermediate_report["transpiled_circuit"]
+    optimized_intermediate_circuit, optimizer = optimize_circuit_with_phase_poly(
+        intermediate_circuit,
+        CouplingMap(intermediate_estimator.coupling_map),
+        optimizer_name=optimizer_name,
+    )
+    optimized_intermediate_report = intermediate_estimator.estimate_pretranspiled(
+        optimized_intermediate_circuit,
+        label="optimized-phasepoly-cx-ir",
+        qlbm_metadata=qlbm_metadata,
+        logical_metrics=baseline_native_report["logical"],
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+
+    optimized_native_circuit = native_estimator.transpile_circuit(
+        optimized_intermediate_circuit,
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+    )
+    optimized_native_report = native_estimator.estimate_pretranspiled(
+        optimized_native_circuit,
+        label="optimized-native-after-phasepoly-cx-ir",
+        qlbm_metadata=qlbm_metadata,
+        logical_metrics=baseline_native_report["logical"],
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+
+    return {
+        "pipeline": "intermediate_native",
+        "optimizer": optimizer,
+        "intermediate_basis_gates": intermediate_config["basis_gates"],
+        "native_basis_gates": native_estimator.basis_gates,
+        "baseline_native_report": baseline_native_report,
+        "intermediate_report": intermediate_report,
+        "optimized_intermediate_report": optimized_intermediate_report,
+        "optimized_native_report": optimized_native_report,
+    }
+
+
 def require_compatible(report: Dict[str, Any], label: str) -> None:
     """Raise if a reported physical circuit no longer matches hardware constraints."""
     compatibility = report["transpiled_compatibility"]
@@ -198,7 +331,13 @@ def run_final_counts_simulation(
 ) -> Dict[str, int]:
     """Run one measured circuit and save only the final QLBM result timestep."""
     backend = AerSimulator(method="statevector", seed_simulator=seed_simulator)
-    result = backend.run(circuit, shots=num_shots).result()
+    simulation_circuit = transpile(
+        circuit,
+        backend=backend,
+        optimization_level=0,
+        seed_transpiler=seed_simulator,
+    )
+    result = backend.run(simulation_circuit, shots=num_shots).result()
     counts = result.get_counts()
 
     qlbm_result = lattice.create_result(str(output_dir), "step")
@@ -237,6 +376,31 @@ def compare_normalized_counts(
         "num_reference_keys": len(reference),
         "num_candidate_keys": len(candidate),
         "deltas": deltas,
+    }
+
+
+def counts_simulation_skip_reason(
+    reference_circuit: QuantumCircuit,
+    candidate_circuit: QuantumCircuit,
+    max_count_simulation_qubits: Optional[int],
+) -> Optional[Dict[str, Any]]:
+    """Return a skip reason when final count simulation is too large."""
+    if max_count_simulation_qubits is None:
+        return None
+
+    largest_num_qubits = max(reference_circuit.num_qubits, candidate_circuit.num_qubits)
+    if largest_num_qubits <= max_count_simulation_qubits:
+        return None
+
+    return {
+        "skipped": True,
+        "reason": (
+            "Final count simulation skipped because the compact routed circuit "
+            "is too large for statevector simulation in this harness."
+        ),
+        "max_count_simulation_qubits": max_count_simulation_qubits,
+        "unoptimized_compact_qubits": reference_circuit.num_qubits,
+        "optimized_compact_qubits": candidate_circuit.num_qubits,
     }
 
 
@@ -295,6 +459,36 @@ def summarize_optimizer_report(report: Any) -> Optional[Dict[str, Any]]:
     }
 
 
+def compare_metric_summary(
+    before: Optional[Dict[str, Any]],
+    after: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Return compact before/after resource deltas for thesis plots."""
+    if before is None or after is None:
+        return None
+
+    def metric_delta(name: str) -> Optional[int]:
+        before_value = before.get(name)
+        after_value = after.get(name)
+        if before_value is None or after_value is None:
+            return None
+        return int(after_value) - int(before_value)
+
+    before_ops = before.get("op_counts", {}) or {}
+    after_ops = after.get("op_counts", {}) or {}
+    op_names = sorted(set(before_ops) | set(after_ops))
+    return {
+        "depth_delta": metric_delta("depth"),
+        "size_delta": metric_delta("size"),
+        "num_1q_ops_delta": metric_delta("num_1q_ops"),
+        "num_2q_ops_delta": metric_delta("num_2q_ops"),
+        "op_count_deltas": {
+            name: int(after_ops.get(name, 0)) - int(before_ops.get(name, 0))
+            for name in op_names
+        },
+    }
+
+
 def write_json_report(path: Path, payload: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as file:
@@ -316,8 +510,11 @@ def resolve_output_paths(
 def run_phase_poly_harness(
     hardware_name: str,
     optimizer_name: str = "architecture_aware",
+    pipeline: str = "intermediate_native",
+    intermediate_basis_gates: Optional[list[str]] = None,
     num_steps: int = 1,
     num_shots: int = NUM_SHOTS,
+    max_count_simulation_qubits: Optional[int] = DEFAULT_MAX_COUNT_SIMULATION_QUBITS,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     output_file_path_base: Optional[Path] = None,
     output_file_path_optimized: Optional[Path] = None,
@@ -342,59 +539,145 @@ def run_phase_poly_harness(
         output_file_path_optimized,
     )
 
-    unoptimized_report = run_logical_resource_estimation(estimator, case)
-    if unoptimized_report.get("transpile_error"):
-        raise RuntimeError(unoptimized_report["transpile_error"])
-    require_compatible(unoptimized_report, "Unoptimized")
+    if pipeline == "post_transpile":
+        unoptimized_report = run_logical_resource_estimation(estimator, case)
+        if unoptimized_report.get("transpile_error"):
+            raise RuntimeError(unoptimized_report["transpile_error"])
+        require_compatible(unoptimized_report, "Unoptimized")
 
-    physical_circuit = unoptimized_report["transpiled_circuit"]
-    optimized_circuit, optimizer = optimize_circuit_with_phase_poly(
-        physical_circuit,
-        CouplingMap(estimator.coupling_map),
-        optimizer_name=optimizer_name,
-    )
-    optimized_report = estimator.estimate_pretranspiled(
-        optimized_circuit,
-        label=f"{output_case_label}-phasepoly-optimized",
-        qlbm_metadata=case["metadata"],
-        logical_metrics=unoptimized_report["logical"],
-        phase_polynomial_analysis=True,
-    )
-    if optimizer_name == "architecture_aware":
-        require_compatible(optimized_report, "Optimized")
+        physical_circuit = unoptimized_report["transpiled_circuit"]
+        optimized_circuit, optimizer = optimize_circuit_with_phase_poly(
+            physical_circuit,
+            CouplingMap(estimator.coupling_map),
+            optimizer_name=optimizer_name,
+        )
+        optimized_report = estimator.estimate_pretranspiled(
+            optimized_circuit,
+            label=f"{output_case_label}-phasepoly-optimized",
+            qlbm_metadata=case["metadata"],
+            logical_metrics=unoptimized_report["logical"],
+            phase_polynomial_analysis=True,
+        )
+        if optimizer_name == "architecture_aware":
+            require_compatible(optimized_report, "Optimized")
 
-    unoptimized_counts = run_final_counts_simulation(
+        intermediate_report = None
+        optimized_intermediate_report = None
+        intermediate_basis = None
+        native_basis = estimator.basis_gates
+    elif pipeline == "intermediate_native":
+        pipeline_reports = run_intermediate_native_phase_poly_pipeline(
+            case["logical_circuit"],
+            hardware_config,
+            optimizer_name=optimizer_name,
+            intermediate_basis_gates=intermediate_basis_gates,
+            optimization_level=OPTIMIZATION_LEVEL,
+            seed_transpiler=SEED_TRANSPILER,
+            qlbm_metadata=case["metadata"],
+            phase_polynomial_analysis=True,
+        )
+        unoptimized_report = pipeline_reports["baseline_native_report"]
+        optimized_report = pipeline_reports["optimized_native_report"]
+        intermediate_report = pipeline_reports["intermediate_report"]
+        optimized_intermediate_report = pipeline_reports[
+            "optimized_intermediate_report"
+        ]
+        optimizer = pipeline_reports["optimizer"]
+        intermediate_basis = pipeline_reports["intermediate_basis_gates"]
+        native_basis = pipeline_reports["native_basis_gates"]
+
+        require_compatible(unoptimized_report, "Unoptimized native")
+        require_compatible(optimized_report, "Optimized native")
+    else:
+        raise ValueError("pipeline must be one of: intermediate_native, post_transpile")
+
+    count_skip = counts_simulation_skip_reason(
         unoptimized_report["transpiled_compact_circuit"],
-        case["lattice"],
-        output_file_path_base,
-        num_steps,
-        num_shots,
-    )
-    optimized_counts = run_final_counts_simulation(
         optimized_report["transpiled_compact_circuit"],
-        case["lattice"],
-        output_file_path_optimized,
-        num_steps,
-        num_shots,
+        max_count_simulation_qubits,
     )
-    counts_comparison = compare_normalized_counts(
-        unoptimized_counts,
-        optimized_counts,
-        COUNTS_MAX_PROBABILITY_DELTA_TOLERANCE,
-    )
+    if count_skip is None:
+        unoptimized_counts = run_final_counts_simulation(
+            unoptimized_report["transpiled_compact_circuit"],
+            case["lattice"],
+            output_file_path_base,
+            num_steps,
+            num_shots,
+        )
+        optimized_counts = run_final_counts_simulation(
+            optimized_report["transpiled_compact_circuit"],
+            case["lattice"],
+            output_file_path_optimized,
+            num_steps,
+            num_shots,
+        )
+        counts_comparison = compare_normalized_counts(
+            unoptimized_counts,
+            optimized_counts,
+            COUNTS_MAX_PROBABILITY_DELTA_TOLERANCE,
+        )
+        counts_comparison["skipped"] = False
+    else:
+        counts_comparison = {
+            "match": None,
+            "max_probability_delta": None,
+            "total_variation_distance": None,
+            "tolerance": COUNTS_MAX_PROBABILITY_DELTA_TOLERANCE,
+            **count_skip,
+        }
 
     summary = {
         "case": case["label"],
         "hardware": hardware_name,
         "optimizer_name": optimizer_name,
+        "pipeline": pipeline,
+        "native_basis_gates": native_basis,
+        "intermediate_basis_gates": intermediate_basis,
         "num_steps": num_steps,
         "num_shots": num_shots,
+        "max_count_simulation_qubits": max_count_simulation_qubits,
         "output_file_path_base": str(output_file_path_base),
         "output_file_path_optimized": str(output_file_path_optimized),
         "unoptimized_metrics": unoptimized_report["transpiled"],
         "optimized_metrics": optimized_report["transpiled"],
         "unoptimized_compact_metrics": unoptimized_report["transpiled_compact"],
         "optimized_compact_metrics": optimized_report["transpiled_compact"],
+        "native_metric_comparison": compare_metric_summary(
+            unoptimized_report["transpiled"],
+            optimized_report["transpiled"],
+        ),
+        "native_compact_metric_comparison": compare_metric_summary(
+            unoptimized_report["transpiled_compact"],
+            optimized_report["transpiled_compact"],
+        ),
+        "intermediate_metrics": (
+            intermediate_report["transpiled"] if intermediate_report else None
+        ),
+        "optimized_intermediate_metrics": (
+            optimized_intermediate_report["transpiled"]
+            if optimized_intermediate_report
+            else None
+        ),
+        "intermediate_compact_metrics": (
+            intermediate_report["transpiled_compact"] if intermediate_report else None
+        ),
+        "optimized_intermediate_compact_metrics": (
+            optimized_intermediate_report["transpiled_compact"]
+            if optimized_intermediate_report
+            else None
+        ),
+        "intermediate_metric_comparison": compare_metric_summary(
+            intermediate_report["transpiled"] if intermediate_report else None,
+            optimized_intermediate_report["transpiled"]
+            if optimized_intermediate_report
+            else None,
+        ),
+        "intermediate_compact_metric_comparison": compare_metric_summary(
+            intermediate_report["transpiled_compact"] if intermediate_report else None,
+            optimized_intermediate_report["transpiled_compact"]
+            if optimized_intermediate_report
+            else None,
+        ),
         "unoptimized_compatibility": unoptimized_report["transpiled_compatibility"],
         "optimized_compatibility": optimized_report["transpiled_compatibility"],
         "section_analysis": unoptimized_report["section_analysis"],
@@ -404,6 +687,16 @@ def run_phase_poly_harness(
         "optimized_phase_polynomial_analysis": optimized_report[
             "phase_polynomial_analysis"
         ],
+        "intermediate_phase_polynomial_analysis": (
+            intermediate_report["phase_polynomial_analysis"]
+            if intermediate_report
+            else None
+        ),
+        "optimized_intermediate_phase_polynomial_analysis": (
+            optimized_intermediate_report["phase_polynomial_analysis"]
+            if optimized_intermediate_report
+            else None
+        ),
         "optimizer_report": summarize_optimizer_report(
             getattr(optimizer, "last_run_report", None)
         ),
@@ -416,8 +709,9 @@ def run_phase_poly_harness(
 
 
 def main() -> None:
-    hardware_name = "superconducting_google_willow_2024"
+    hardware_name = "superconducting_ibm_nighthawk_r1_2026"
     optimizer_name = "architecture_aware" # CHOOSE BETWEEN architecture_aware AND all_to_all
+    pipeline = "intermediate_native" # CHOOSE BETWEEN intermediate_native AND post_transpile
     num_steps = 1
     num_shots = NUM_SHOTS
     output_root = DEFAULT_OUTPUT_ROOT
@@ -426,13 +720,16 @@ def main() -> None:
     summary = run_phase_poly_harness(
         hardware_name=hardware_name,
         optimizer_name=optimizer_name,
+        pipeline=pipeline,
         num_steps=num_steps,
         num_shots=num_shots,
         output_root=output_root,
         config_path=config_path,
     )
     print(json.dumps(json_safe(summary), indent=2))
-    if not summary["counts_comparison"]["match"]:
+    if summary["counts_comparison"].get("skipped"):
+        print(summary["counts_comparison"]["reason"])
+    elif not summary["counts_comparison"]["match"]:
         raise SystemExit("Optimized final counts differ from baseline beyond tolerance")
 
 

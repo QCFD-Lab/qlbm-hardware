@@ -64,28 +64,28 @@
       "t2_s": 115e-6
     }
   },
-  "superconducting_ibm_kyoto_2025": {
-    "id": "ibm kyoto 2025",
+  "superconducting_ibm_kyoto_2024": {
+    "id": "ibm kyoto 2024",
     "architecture": "superconducting fixed-frequency transmon",
     "device_name": "IBM Kyoto",
     "year_reported": 2025,
     "num_qubits": 127,
-    "basis_gates": ["rz", "sx", "x", "cx"],
-    "coupling_type": "heavy_hexagonal",
+    "basis_gates": ["rz", "sx", "x", "ecr"],
+    "coupling_type": "fake_backend",
     "coupling_params": {
-      "layout_style": "heavy_hex"
+      "backend": "FakeKyoto"
     },
     "gate_times_s": {
       "rz": 0.0,
       "sx": 35e-9,
       "x": 35e-9,
-      "cx": 260e-9
+      "ecr": 260e-9
     },
     "gate_fidelities": {
       "rz": 1.0,
       "sx": 0.99982,
       "x": 0.99982,
-      "cx": 0.978
+      "ecr": 0.978
     },
     "measurement_time_s": 680e-9,
     "measurement_fidelity": 0.982,
