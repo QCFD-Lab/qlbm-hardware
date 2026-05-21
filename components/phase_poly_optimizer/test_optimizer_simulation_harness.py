@@ -13,6 +13,8 @@ from components.phase_poly_optimizer.optimizer_benchmark_simulation import (
     counts_simulation_skip_reason,
     compare_metric_summary,
     compare_normalized_counts,
+    run_all_to_all_intermediate_native_phase_poly_pipeline,
+    run_phase_poly_harness,
     run_intermediate_native_phase_poly_pipeline,
     run_final_counts_simulation,
 )
@@ -47,6 +49,27 @@ class FakeLattice:
             }
         )
         return result
+
+
+def _tiny_config_path(tmp_path: Path) -> Path:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+{
+  "tiny_cz_backend": {
+    "id": "tiny_cz_backend",
+    "architecture": "tiny cz backend",
+    "num_qubits": 105,
+    "basis_gates": ["rz", "sx", "x", "cz"],
+    "coupling_type": "all_to_all",
+    "gate_times_s": {"rz": 0.0, "sx": 10e-9, "x": 10e-9, "cz": 80e-9},
+    "measurement_time_s": 1e-6
+  }
+}
+""",
+        encoding="utf-8",
+    )
+    return config_path
 
 
 def test_full_logical_composition_uses_repeated_algorithm_and_measurement():
@@ -247,3 +270,57 @@ def test_intermediate_native_pipeline_retranspiles_to_native_basis():
     assert baseline_native["op_counts"].get("cz", 0) > 0
     assert optimized_native["op_counts"].get("cx", 0) == 0
     assert result["optimized_native_report"]["transpiled_compatibility"]["compatible"]
+
+
+def test_all_to_all_intermediate_native_pipeline_uses_a2a_optimizer_then_native_routing():
+    circuit = QuantumCircuit(3, 3)
+    circuit.cx(0, 2)
+    circuit.rz(0.2, 2)
+    circuit.cx(0, 2)
+    circuit.measure([0, 1, 2], [0, 1, 2])
+    hardware_config = {
+        "id": "line_cz_backend",
+        "architecture": "line cz test backend",
+        "num_qubits": 3,
+        "basis_gates": ["rz", "sx", "x", "cz"],
+        "coupling_map": [[0, 1], [1, 0], [1, 2], [2, 1]],
+        "gate_times_s": {"rz": 0.0, "sx": 10e-9, "x": 10e-9, "cz": 80e-9},
+        "measurement_time_s": 1e-6,
+    }
+
+    result = run_all_to_all_intermediate_native_phase_poly_pipeline(
+        circuit,
+        hardware_config,
+        optimization_level=0,
+        seed_transpiler=42,
+    )
+
+    intermediate_report = result["intermediate_report"]
+    optimized_native_report = result["optimized_native_report"]
+
+    assert result["pipeline"] == "all_to_all_intermediate_native"
+    assert result["optimizer"].last_run_report.num_blocks >= 1
+    assert intermediate_report["transpiled_compatibility"]["coupling_map_checked"] is False
+    assert intermediate_report["transpiled"]["op_counts"].get("cx", 0) > 0
+    assert optimized_native_report["transpiled"]["op_counts"].get("cx", 0) == 0
+    assert optimized_native_report["transpiled_compatibility"]["compatible"] is True
+
+
+def test_harness_can_skip_final_counts_simulation(tmp_path):
+    summary = run_phase_poly_harness(
+        hardware_name="tiny_cz_backend",
+        pipeline="all_to_all_intermediate_native",
+        num_steps=1,
+        num_shots=8,
+        run_counts_simulation=False,
+        output_root=tmp_path / "output",
+        config_path=_tiny_config_path(tmp_path),
+    )
+
+    assert summary["run_counts_simulation"] is False
+    assert summary["counts_comparison"]["skipped"] is True
+    assert summary["counts_comparison"]["match"] is None
+    assert (
+        summary["counts_comparison"]["reason"]
+        == "Final count simulation disabled by run_counts_simulation=False."
+    )

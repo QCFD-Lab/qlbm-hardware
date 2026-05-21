@@ -1,0 +1,20 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrr}
+\hline
+Metric & ABQLBM & MSQLBM & SpaceTimeQLBM \\
+\hline
+Depth base & 31791 & 63824 & 5490 \\
+Depth opt. & 28810 & 57150 & 5219 \\
+CX base & 26442 & 57115 & 4587 \\
+CX opt. & 25153 & 52874 & 4539 \\
+CX red. (\%) & 4.87 & 7.43 & 1.05 \\
+RZ base & 18591 & 41770 & 2985 \\
+RZ opt. & 16069 & 35896 & 2629 \\
+Gates base & 49335 & 110306 & 8654 \\
+Gates opt. & 45524 & 100191 & 8250 \\
+\hline
+\end{tabular}
+\caption{Unoptimized and phase-polynomial-optimized resource metrics after transpilation to a hypothetical 49-qubit 7x7 2D nearest-neighbour CX/RZ basis using the architecture-aware optimizer.}
+\label{tab:phase-poly-optimization-comparison-2d-grid}
+\end{table}

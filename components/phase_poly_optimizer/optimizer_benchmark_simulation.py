@@ -303,6 +303,95 @@ def run_intermediate_native_phase_poly_pipeline(
     }
 
 
+def run_all_to_all_intermediate_native_phase_poly_pipeline(
+    circuit: QuantumCircuit,
+    hardware_config: Dict[str, Any],
+    intermediate_basis_gates: Optional[list[str]] = None,
+    optimization_level: int = OPTIMIZATION_LEVEL,
+    seed_transpiler: int = SEED_TRANSPILER,
+    qlbm_metadata: Optional[Dict[str, Any]] = None,
+    phase_polynomial_analysis: bool = True,
+) -> Dict[str, Any]:
+    """
+    Optimize an all-to-all CX/RZ phase-polynomial IR, then compile to native hardware.
+
+    This is the baseline for comparing architecture-aware phase-polynomial
+    optimization against all-to-all phase-polynomial optimization followed by
+    hardware routing and native-basis translation.
+    """
+    native_estimator = QLBMResourceEstimator(hardware_config)
+    intermediate_config = build_phase_poly_intermediate_hardware_config(
+        hardware_config,
+        intermediate_basis_gates=intermediate_basis_gates,
+    )
+    intermediate_estimator = QLBMResourceEstimator(
+        intermediate_config,
+        force_no_coupling=True,
+    )
+
+    baseline_native_report = native_estimator.estimate(
+        circuit,
+        label="baseline-native",
+        qlbm_metadata=qlbm_metadata,
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+        transpile_circuit=True,
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+    if baseline_native_report.get("transpile_error"):
+        raise RuntimeError(baseline_native_report["transpile_error"])
+
+    intermediate_report = intermediate_estimator.estimate(
+        circuit,
+        label="baseline-all-to-all-phasepoly-cx-ir",
+        qlbm_metadata=qlbm_metadata,
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+        transpile_circuit=True,
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+    if intermediate_report.get("transpile_error"):
+        raise RuntimeError(intermediate_report["transpile_error"])
+
+    intermediate_circuit = intermediate_report["transpiled_circuit"]
+    optimized_intermediate_circuit, optimizer = optimize_circuit_with_phase_poly(
+        intermediate_circuit,
+        CouplingMap.from_full(intermediate_circuit.num_qubits),
+        optimizer_name="all_to_all",
+    )
+    optimized_intermediate_report = intermediate_estimator.estimate_pretranspiled(
+        optimized_intermediate_circuit,
+        label="optimized-all-to-all-phasepoly-cx-ir",
+        qlbm_metadata=qlbm_metadata,
+        logical_metrics=baseline_native_report["logical"],
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+
+    optimized_native_circuit = native_estimator.transpile_circuit(
+        optimized_intermediate_circuit,
+        optimization_level=optimization_level,
+        seed_transpiler=seed_transpiler,
+    )
+    optimized_native_report = native_estimator.estimate_pretranspiled(
+        optimized_native_circuit,
+        label="optimized-native-after-all-to-all-phasepoly-cx-ir",
+        qlbm_metadata=qlbm_metadata,
+        logical_metrics=baseline_native_report["logical"],
+        phase_polynomial_analysis=phase_polynomial_analysis,
+    )
+
+    return {
+        "pipeline": "all_to_all_intermediate_native",
+        "optimizer": optimizer,
+        "intermediate_basis_gates": intermediate_config["basis_gates"],
+        "native_basis_gates": native_estimator.basis_gates,
+        "baseline_native_report": baseline_native_report,
+        "intermediate_report": intermediate_report,
+        "optimized_intermediate_report": optimized_intermediate_report,
+        "optimized_native_report": optimized_native_report,
+    }
+
+
 def require_compatible(report: Dict[str, Any], label: str) -> None:
     """Raise if a reported physical circuit no longer matches hardware constraints."""
     compatibility = report["transpiled_compatibility"]
@@ -514,6 +603,7 @@ def run_phase_poly_harness(
     intermediate_basis_gates: Optional[list[str]] = None,
     num_steps: int = 1,
     num_shots: int = NUM_SHOTS,
+    run_counts_simulation: bool = True,
     max_count_simulation_qubits: Optional[int] = DEFAULT_MAX_COUNT_SIMULATION_QUBITS,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     output_file_path_base: Optional[Path] = None,
@@ -527,10 +617,15 @@ def run_phase_poly_harness(
     hardware_config = hardware_configs[hardware_name]
     estimator = QLBMResourceEstimator(hardware_config)
     case = build_ab_8x4_case(num_steps)
+    effective_optimizer_name = (
+        "all_to_all"
+        if pipeline == "all_to_all_intermediate_native"
+        else optimizer_name
+    )
     output_case_label = (
         case["label"]
-        if optimizer_name == "architecture_aware"
-        else f"{case['label']}-{optimizer_name}"
+        if effective_optimizer_name == "architecture_aware"
+        else f"{case['label']}-{effective_optimizer_name}"
     )
     output_file_path_base, output_file_path_optimized = resolve_output_paths(
         output_case_label,
@@ -588,14 +683,45 @@ def run_phase_poly_harness(
 
         require_compatible(unoptimized_report, "Unoptimized native")
         require_compatible(optimized_report, "Optimized native")
-    else:
-        raise ValueError("pipeline must be one of: intermediate_native, post_transpile")
+    elif pipeline == "all_to_all_intermediate_native":
+        pipeline_reports = run_all_to_all_intermediate_native_phase_poly_pipeline(
+            case["logical_circuit"],
+            hardware_config,
+            intermediate_basis_gates=intermediate_basis_gates,
+            optimization_level=OPTIMIZATION_LEVEL,
+            seed_transpiler=SEED_TRANSPILER,
+            qlbm_metadata=case["metadata"],
+            phase_polynomial_analysis=True,
+        )
+        unoptimized_report = pipeline_reports["baseline_native_report"]
+        optimized_report = pipeline_reports["optimized_native_report"]
+        intermediate_report = pipeline_reports["intermediate_report"]
+        optimized_intermediate_report = pipeline_reports[
+            "optimized_intermediate_report"
+        ]
+        optimizer = pipeline_reports["optimizer"]
+        intermediate_basis = pipeline_reports["intermediate_basis_gates"]
+        native_basis = pipeline_reports["native_basis_gates"]
 
-    count_skip = counts_simulation_skip_reason(
-        unoptimized_report["transpiled_compact_circuit"],
-        optimized_report["transpiled_compact_circuit"],
-        max_count_simulation_qubits,
-    )
+        require_compatible(unoptimized_report, "Unoptimized native")
+        require_compatible(optimized_report, "Optimized native")
+    else:
+        raise ValueError(
+            "pipeline must be one of: post_transpile, intermediate_native, "
+            "all_to_all_intermediate_native"
+        )
+
+    if run_counts_simulation:
+        count_skip = counts_simulation_skip_reason(
+            unoptimized_report["transpiled_compact_circuit"],
+            optimized_report["transpiled_compact_circuit"],
+            max_count_simulation_qubits,
+        )
+    else:
+        count_skip = {
+            "skipped": True,
+            "reason": "Final count simulation disabled by run_counts_simulation=False.",
+        }
     if count_skip is None:
         unoptimized_counts = run_final_counts_simulation(
             unoptimized_report["transpiled_compact_circuit"],
@@ -629,12 +755,13 @@ def run_phase_poly_harness(
     summary = {
         "case": case["label"],
         "hardware": hardware_name,
-        "optimizer_name": optimizer_name,
+        "optimizer_name": effective_optimizer_name,
         "pipeline": pipeline,
         "native_basis_gates": native_basis,
         "intermediate_basis_gates": intermediate_basis,
         "num_steps": num_steps,
         "num_shots": num_shots,
+        "run_counts_simulation": run_counts_simulation,
         "max_count_simulation_qubits": max_count_simulation_qubits,
         "output_file_path_base": str(output_file_path_base),
         "output_file_path_optimized": str(output_file_path_optimized),
@@ -709,11 +836,12 @@ def run_phase_poly_harness(
 
 
 def main() -> None:
-    hardware_name = "superconducting_ibm_nighthawk_r1_2026"
+    hardware_name = "superconducting_google_willow_2024"
     optimizer_name = "architecture_aware" # CHOOSE BETWEEN architecture_aware AND all_to_all
-    pipeline = "intermediate_native" # CHOOSE BETWEEN intermediate_native AND post_transpile
+    pipeline = "all_to_all_intermediate_native" # CHOOSE BETWEEN post_transpile, intermediate_native, all_to_all_intermediate_native
     num_steps = 1
     num_shots = NUM_SHOTS
+    run_counts_simulation = True
     output_root = DEFAULT_OUTPUT_ROOT
     config_path = None
 
@@ -723,6 +851,7 @@ def main() -> None:
         pipeline=pipeline,
         num_steps=num_steps,
         num_shots=num_shots,
+        run_counts_simulation=run_counts_simulation,
         output_root=output_root,
         config_path=config_path,
     )

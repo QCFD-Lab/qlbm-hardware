@@ -1,0 +1,20 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrr}
+\hline
+Metric & ABQLBM & MSQLBM & SpaceTimeQLBM \\
+\hline
+Direct HW depth & 77875 & 154179 & 13136 \\
+IR-opt HW depth & 92121 & 184952 & 17291 \\
+Direct HW 2Q & 27285 & 62014 & 5616 \\
+IR-opt HW 2Q & 26038 & 57625 & 5566 \\
+HW 2Q red. (\%) & 4.57 & 7.08 & 0.89 \\
+Direct HW RZ & 54314 & 111194 & 7929 \\
+IR-opt HW RZ & 120169 & 266461 & 24902 \\
+Direct HW gates & 140470 & 308657 & 25859 \\
+IR-opt HW gates & 202585 & 450757 & 42682 \\
+\hline
+\end{tabular}
+\caption{Comparison of direct hardware transpilation against the full intermediate-representation phase-polynomial workflow for Nighthawk r1 using the architecture-aware optimizer. The direct hardware circuit is compiled to the native basis rz sx x cz rx; the optimized workflow uses the intermediate basis rz sx x cx before recompilation to the same hardware target. The circuits use an 8x8 lattice with 1 bounceback obstacle and 1 timestep.}
+\label{tab:phase-poly-ir-flow-comparison-8x8-obs1-t1-ibm-nighthawk-r1-2025-architecture-aware}
+\end{table}

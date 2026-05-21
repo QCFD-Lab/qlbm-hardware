@@ -1,0 +1,20 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrr}
+\hline
+Metric & ABQLBM & MSQLBM & SpaceTimeQLBM \\
+\hline
+Depth base & 34248 & 113936 & 3994 \\
+Depth opt. & 29324 & 93018 & 3731 \\
+CX base & 18203 & 60760 & 1468 \\
+CX opt. & 16409 & 50365 & 1460 \\
+CX red. (\%) & 9.86 & 17.11 & 0.54 \\
+RZ base & 37343 & 122698 & 3393 \\
+RZ opt. & 29494 & 93297 & 2829 \\
+Gates base & 65514 & 217139 & 6071 \\
+Gates opt. & 55871 & 177343 & 5499 \\
+\hline
+\end{tabular}
+\caption{Unoptimized and phase-polynomial-optimized resource metrics after transpilation to a hypothetical 49-qubit all-to-all CX/RZ basis using the all-to-all optimizer for 8x8 QLBM circuits with 3 bounceback obstacles and 1 timestep.}
+\label{tab:phase-poly-optimization-comparison-8x8-obs3-t1-all-to-all}
+\end{table}
