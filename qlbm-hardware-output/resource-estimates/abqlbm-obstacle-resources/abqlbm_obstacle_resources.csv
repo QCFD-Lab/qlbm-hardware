@@ -1,0 +1,31 @@
+algorithm,grid,num_obstacles,num_timesteps,hardware_label,logical_qubits,transpiled_compact_qubits,logical_gate_count,transpiled_gate_count,logical_two_qubit_count,transpiled_two_qubit_count,logical_circuit_depth,transpiled_circuit_depth,max_2q_section,max_2q_section_count,max_time_section,max_time_section_critical_path_s
+ABQLBM,16x16,0,1,Willow (Chip 2),13,15,169,53256,35,9828,86,32728,algorithm_step_1,9786,algorithm_step_1,0.0015201150000001126
+ABQLBM,16x16,0,1,Nighthawk r1,13,12,169,16151,35,4884,86,9664,algorithm_step_1,4929,algorithm_step_1,0.001062650000000011
+ABQLBM,16x16,0,1,IBM Eagle r3,13,12,169,32471,35,5565,86,16866,algorithm_step_1,5181,algorithm_step_1,0.003547394999999259
+ABQLBM,16x16,0,1,Quantinuum System Model H2,13,12,169,8748,35,2115,86,4733,algorithm_step_1,2112,algorithm_step_1,0.43730999999999776
+ABQLBM,16x16,0,1,Neutral-atom Rydberg processor,13,12,169,6418,35,2187,86,3813,algorithm_step_1,2184,measurement,0.005
+ABQLBM,16x16,0,1,Tunnel Falls,13,12,169,7311,35,2187,86,4108,algorithm_step_1,2184,algorithm_step_1,0.001147000000000004
+ABQLBM,16x16,1,1,Willow (Chip 2),15,20,3063,276902,1427,50702,1443,154589,algorithm_step_1,51038,algorithm_step_1,0.007526294999997814
+ABQLBM,16x16,1,1,Nighthawk r1,15,16,3063,79308,1427,25514,1443,45125,algorithm_step_1,25478,algorithm_step_1,0.005067144999996722
+ABQLBM,16x16,1,1,IBM Eagle r3,15,21,3063,196564,1427,34210,1443,89368,algorithm_step_1,33865,algorithm_step_1,0.02148014499999172
+ABQLBM,16x16,1,1,Quantinuum System Model H2,15,15,3063,47595,1427,11413,1443,23008,algorithm_step_1,11410,algorithm_step_1,1.9632400000000152
+ABQLBM,16x16,1,1,Neutral-atom Rydberg processor,15,15,3063,33983,1427,12743,1443,19191,algorithm_step_1,12740,algorithm_step_1,0.01324807999999846
+ABQLBM,16x16,1,1,Tunnel Falls,15,15,3063,36619,1427,12743,1443,20259,algorithm_step_1,12740,algorithm_step_1,0.005831199999999298
+ABQLBM,16x16,2,1,Willow (Chip 2),15,20,5597,392878,2707,71714,2443,217178,algorithm_step_1,72818,algorithm_step_1,0.010356745000000755
+ABQLBM,16x16,2,1,Nighthawk r1,15,16,5597,109959,2707,36191,2443,59299,algorithm_step_1,36221,algorithm_step_1,0.007134444999992309
+ABQLBM,16x16,2,1,IBM Eagle r3,15,15,5597,296759,2707,52012,2443,131459,algorithm_step_1,50368,algorithm_step_1,0.031360229999969715
+ABQLBM,16x16,2,1,Quantinuum System Model H2,15,15,5597,68048,2707,16293,2443,30582,algorithm_step_1,16290,algorithm_step_1,2.6012000000001403
+ABQLBM,16x16,2,1,Neutral-atom Rydberg processor,15,15,5597,48975,2707,18695,2443,26167,algorithm_step_1,18692,algorithm_step_1,0.01793419999999649
+ABQLBM,16x16,2,1,Tunnel Falls,15,15,5597,51865,2707,18695,2443,27375,algorithm_step_1,18692,algorithm_step_1,0.008000799999999262
+ABQLBM,16x16,3,1,Willow (Chip 2),15,16,8121,516100,3987,93980,3443,268643,algorithm_step_1,94022,algorithm_step_1,0.013313120000004841
+ABQLBM,16x16,3,1,Nighthawk r1,15,20,8121,138870,3987,46328,3443,76591,algorithm_step_1,47003,algorithm_step_1,0.00878800499999509
+ABQLBM,16x16,3,1,IBM Eagle r3,15,15,8121,387266,3987,67600,3443,163478,algorithm_step_1,66994,algorithm_step_1,0.04126545999999394
+ABQLBM,16x16,3,1,Quantinuum System Model H2,15,15,8121,88483,3987,21173,3443,38152,algorithm_step_1,21170,algorithm_step_1,3.247120000000268
+ABQLBM,16x16,3,1,Neutral-atom Rydberg processor,15,15,8121,63956,3987,24647,3443,33143,algorithm_step_1,24644,algorithm_step_1,0.02262505999999578
+ABQLBM,16x16,3,1,Tunnel Falls,15,15,8121,67097,3987,24647,3443,34491,algorithm_step_1,24644,algorithm_step_1,0.010171599999998832
+ABQLBM,16x16,4,1,Willow (Chip 2),15,16,10645,641121,5267,116798,4443,329429,algorithm_step_1,115934,algorithm_step_1,0.016627625000015325
+ABQLBM,16x16,4,1,Nighthawk r1,15,16,10645,172966,5267,57752,4443,90694,algorithm_step_1,58832,algorithm_step_1,0.011182115000005979
+ABQLBM,16x16,4,1,IBM Eagle r3,15,15,10645,497556,5267,86968,4443,207540,algorithm_step_1,85744,algorithm_step_1,0.05206903500002289
+ABQLBM,16x16,4,1,Quantinuum System Model H2,15,15,10645,108925,5267,26053,4443,45726,algorithm_step_1,26050,algorithm_step_1,3.893770000000366
+ABQLBM,16x16,4,1,Neutral-atom Rydberg processor,15,15,10645,78938,5267,30599,4443,40119,algorithm_step_1,30596,algorithm_step_1,0.027310439999995384
+ABQLBM,16x16,4,1,Tunnel Falls,15,15,10645,82333,5267,30599,4443,41607,algorithm_step_1,30596,algorithm_step_1,0.012341199999998028

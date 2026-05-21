@@ -1,0 +1,74 @@
+{
+  "label": "spacetime_4x4_d2q4_t1_no_obstacles",
+  "hardware": {
+    "id": "aws2023",
+    "architecture": "neutral-atom",
+    "device_name": null,
+    "year_reported": 2023,
+    "num_qubits": 20,
+    "topology_num_qubits": 20,
+    "basis_gates": [
+      "rx",
+      "ry",
+      "rz",
+      "cz",
+      "cx"
+    ],
+    "coupling_type": null,
+    "num_couplings": 38,
+    "directed_coupling": false,
+    "validation_warnings": []
+  },
+  "qlbm": {
+    "algorithm": "SpaceTimeQLBM",
+    "lattice": {
+      "lattice": {
+        "dim": {
+          "x": 4,
+          "y": 4
+        },
+        "velocities": "D2Q4"
+      },
+      "geometry": []
+    },
+    "num_timesteps": 1
+  },
+  "logical": {
+    "num_qubits": 24,
+    "num_clbits": 8,
+    "depth": 58,
+    "size": 175,
+    "width": 32,
+    "op_counts": {
+      "x": 90,
+      "mcx": 30,
+      "cx": 30,
+      "swap": 8,
+      "measure": 8,
+      "mcmt": 5,
+      "h": 4
+    },
+    "num_1q_ops": 94,
+    "num_2q_ops": 38,
+    "num_3q_plus_ops": 35,
+    "num_measure": 8,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.2275449101796407
+  },
+  "logical_capacity": {
+    "logical_qubits": 24,
+    "available_qubits": 20,
+    "qubit_capacity_ok": false
+  },
+  "transpiled": null,
+  "transpiled_circuit": null,
+  "transpiled_compatibility": null,
+  "transpiled_time": null,
+  "transpiled_compact": null,
+  "transpiled_compact_circuit": null,
+  "section_analysis": null,
+  "overheads": null,
+  "transpile_error": "CircuitTooWideForTarget('Number of qubits (24) in circuit-3249 is greater than maximum (20) in the coupling_map')"
+}

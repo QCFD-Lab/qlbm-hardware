@@ -9,8 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from components.resource_estimator import QLBMResourceEstimator
-from components.resource_estimator.benchmark_qlbm_resources_v2 import (
+from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
+from components.resource_estimator.benchmark_qlbm_resources_v2 import (  # noqa: E402
     build_full_logical_circuit,
     build_sectioned_logical_circuit,
 )
@@ -114,6 +114,28 @@ def test_basis_gate_check_reports_unsupported_gate():
     assert estimator.unsupported_gates(qc) == ["z"]
 
 
+def test_transpile_basis_and_gate_time_aliases_are_used():
+    qc = QuantumCircuit(1)
+    qc.rx(0.2, 0)
+
+    estimator = QLBMResourceEstimator(
+        {
+            "id": "alias_backend",
+            "num_qubits": 1,
+            "basis_gates": ["native_xy"],
+            "transpile_basis_gates": ["rx"],
+            "gate_times_s": {"native_xy": 10e-6},
+            "gate_time_aliases": {"rx": "native_xy"},
+        }
+    )
+
+    assert estimator.hardware_summary()["basis_gates"] == ["native_xy"]
+    assert estimator.hardware_summary()["transpile_basis_gates"] == ["rx"]
+    assert estimator.obeys_basis_gates(qc)
+    assert estimator.estimate_time(qc)["unknown_gate_times"] == []
+    assert estimator.estimate_time(qc)["serial_time_s"] == 10e-6
+
+
 def test_coupling_map_check_passes_and_fails():
     estimator = QLBMResourceEstimator(simple_hardware_config())
 
@@ -136,6 +158,25 @@ def test_coupling_map_check_passes_and_fails():
     )
     assert detailed["num_coupling_violations"] == 1
     assert detailed["coupling_violations"][0]["qubits"] == [0, 2]
+
+
+def test_heavy_hex_backend_generates_coupling_map():
+    estimator = QLBMResourceEstimator(
+        {
+            "id": "heavy_hex_test",
+            "num_qubits": 127,
+            "basis_gates": ["rz", "sx", "x", "ecr"],
+            "coupling_type": "heavy_hex",
+            "coupling_params": {"backend": "FakeKyoto"},
+            "gate_times_s": {"rz": 0.0, "sx": 35e-9, "x": 35e-9, "ecr": 660e-9},
+            "measurement_time_s": 1e-6,
+        }
+    )
+
+    assert estimator.coupling_map
+    assert estimator.hardware_summary()["coupling_type"] == "heavy_hex"
+    assert estimator.hardware_summary()["topology_num_qubits"] == 127
+    assert estimator.hardware_summary()["num_couplings"] > 0
 
 
 def test_transpilation_returns_metrics():

@@ -1,4 +1,0 @@
-platform,num_qubits,depth,size,ops_per_gate,ops_1q,ops_2q,ops_3q,ops_other,naive_total_time_s
-superconducting_google_willow_2024,16,21445,39616,"{'rz': 16605, 'cx': 15586, 'sx': 6742, 'x': 683}",24030,15586,0,0,0.0033028249999999997
-trapped_ion_oxford_2024,16,13993,24710,"{'rz': 10819, 'cx': 9480, 'ry': 3510, 'rx': 899, 'rxx': 2}",15228,9482,0,0,0.035511999999999995
-neutral_atom_aws_2023,16,13037,23485,"{'rz': 10247, 'cx': 8667, 'ry': 3651, 'rx': 751, 'cz': 169}",14649,8836,0,0,0.06182

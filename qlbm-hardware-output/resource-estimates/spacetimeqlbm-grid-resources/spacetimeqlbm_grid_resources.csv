@@ -1,0 +1,19 @@
+algorithm,grid,num_obstacles,num_timesteps,hardware_label,logical_qubits,transpiled_compact_qubits,logical_gate_count,transpiled_gate_count,logical_two_qubit_count,transpiled_two_qubit_count,logical_circuit_depth,transpiled_circuit_depth,max_2q_section,max_2q_section_count,max_time_section,max_time_section_critical_path_s
+SpaceTimeQLBM,8x8,0,1,Willow (Chip 2),26,27,199,23246,38,4310,60,11760,initial_conditions,3570,initial_conditions,0.0005248099999999977
+SpaceTimeQLBM,8x8,0,1,Nighthawk r1,26,30,199,5790,38,1952,60,2824,initial_conditions,1599,initial_conditions,0.00032029000000001056
+SpaceTimeQLBM,8x8,0,1,IBM Eagle r3,26,31,199,18791,38,3346,60,7717,initial_conditions,2820,initial_conditions,0.0018015199999999916
+SpaceTimeQLBM,8x8,0,1,Quantinuum System Model H2,26,26,199,4472,38,1037,60,2408,initial_conditions,870,initial_conditions,0.16435000000000377
+SpaceTimeQLBM,8x8,0,1,Neutral-atom Rydberg processor,26,26,199,1786,38,692,60,1047,initial_conditions,490,measurement,0.005
+SpaceTimeQLBM,8x8,0,1,Tunnel Falls,26,26,199,2130,38,692,60,1130,initial_conditions,490,initial_conditions,0.000283800000000004
+SpaceTimeQLBM,16x16,0,1,Willow (Chip 2),28,29,243,32872,38,6100,61,14726,initial_conditions,5136,initial_conditions,0.0006878299999999878
+SpaceTimeQLBM,16x16,0,1,Nighthawk r1,28,29,243,8168,38,2818,61,3699,initial_conditions,2184,initial_conditions,0.0004016100000000138
+SpaceTimeQLBM,16x16,0,1,IBM Eagle r3,28,28,243,26709,38,4781,61,10557,initial_conditions,3753,initial_conditions,0.0023459699999998306
+SpaceTimeQLBM,16x16,0,1,Quantinuum System Model H2,28,28,243,6035,38,1401,61,2804,initial_conditions,1230,initial_conditions,0.18938000000000568
+SpaceTimeQLBM,16x16,0,1,Neutral-atom Rydberg processor,28,28,243,2182,38,864,61,1214,initial_conditions,646,measurement,0.005
+SpaceTimeQLBM,16x16,0,1,Tunnel Falls,28,28,243,2533,38,864,61,1304,initial_conditions,646,initial_conditions,0.0003278000000000051
+SpaceTimeQLBM,32x32,0,1,Willow (Chip 2),30,35,287,41933,38,7770,61,18053,initial_conditions,6702,initial_conditions,0.0008858999999999624
+SpaceTimeQLBM,32x32,0,1,Nighthawk r1,30,32,287,10945,38,3805,61,4933,initial_conditions,2797,initial_conditions,0.0005145850000000186
+SpaceTimeQLBM,32x32,0,1,IBM Eagle r3,30,37,287,34456,38,6165,61,12740,initial_conditions,4980,initial_conditions,0.00308105499999957
+SpaceTimeQLBM,32x32,0,1,Quantinuum System Model H2,30,30,287,7616,38,1765,61,3314,initial_conditions,1590,initial_conditions,0.22299000000000824
+SpaceTimeQLBM,32x32,0,1,Neutral-atom Rydberg processor,30,30,287,2585,38,1036,61,1416,initial_conditions,802,measurement,0.005
+SpaceTimeQLBM,32x32,0,1,Tunnel Falls,30,30,287,2940,38,1036,61,1506,initial_conditions,802,initial_conditions,0.0003806000000000064

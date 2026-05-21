@@ -156,7 +156,7 @@ def flatten_resources_for_csv(r: CircuitResources) -> Dict[str, Any]:
 
 
 def main() -> None:
-    outdir = Path("../qlbm-hardware-output/resource-estimates/test_msqlbm_resource-estimates")
+    outdir = Path("../docs/test_msqlbm_resource-estimates")
 
     label = "MSQLBM_3D_16384x16384x16384_v4x4x4_no_obstacles"
 

@@ -84,7 +84,7 @@
   "superconducting_ibm_eagle_r3_2024": {
     "id": "ibm eagle r3 representative 2024",
     "architecture": "superconducting fixed-frequency transmon",
-    "device_name": "IBM Eagle r3 representative backend",
+    "device_name": "IBM Eagle r3",
     "year_reported": 2024,
     "num_qubits": 127,
     "basis_gates": [
@@ -95,7 +95,7 @@
     ],
     "coupling_type": "heavy_hex",
     "coupling_params": {
-      "backend": "representative Eagle r3 calibration snapshot"
+      "backend": "FakeKyoto"
     },
     "gate_times_s": {
       "rz": 0.0,
@@ -128,6 +128,16 @@
       "zz",
       "rzz"
     ],
+    "transpile_basis_gates": [
+      "rz",
+      "rx",
+      "ry",
+      "rzz"
+    ],
+    "gate_time_aliases": {
+      "rx": "rxy",
+      "ry": "rxy"
+    },
     "coupling_type": "all_to_all",
     "coupling_params": {
       "fully_connected_qubits": 56
@@ -154,7 +164,7 @@
   "neutral_atom_aws_2023": {
     "id": "neutral_atom_evered_aws_quera_harvard_2023",
     "architecture": "neutral-atom Rydberg array",
-    "device_name": "experimental neutral-atom Rydberg processor",
+    "device_name": "Neutral-atom Rydberg processor",
     "year_reported": 2023,
     "num_qubits": 60,
     "basis_gates": [
@@ -197,6 +207,15 @@
       "x",
       "cz"
     ],
+    "transpile_basis_gates": [
+      "rz",
+      "rx",
+      "x",
+      "cz"
+    ],
+    "gate_time_aliases": {
+      "rx": "x"
+    },
     "coupling_type": "line",
     "coupling_params": {
       "num_qubits": 12

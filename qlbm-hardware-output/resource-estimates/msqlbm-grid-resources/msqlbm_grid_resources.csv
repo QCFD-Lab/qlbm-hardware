@@ -1,0 +1,19 @@
+algorithm,grid,num_obstacles,num_timesteps,hardware_label,logical_qubits,transpiled_compact_qubits,logical_gate_count,transpiled_gate_count,logical_two_qubit_count,transpiled_two_qubit_count,logical_circuit_depth,transpiled_circuit_depth,max_2q_section,max_2q_section_count,max_time_section,max_time_section_critical_path_s
+MSQLBM,8x8,0,1,Willow (Chip 2),15,15,439,22564,160,4164,179,11200,algorithm_step_1,4164,algorithm_step_1,0.0005864049999999931
+MSQLBM,8x8,0,1,Nighthawk r1,15,15,439,6750,160,2106,179,3190,algorithm_step_1,2106,algorithm_step_1,0.00039438500000001396
+MSQLBM,8x8,0,1,IBM Eagle r3,15,15,439,12989,160,2277,179,5337,algorithm_step_1,2277,algorithm_step_1,0.0014231649999999947
+MSQLBM,8x8,0,1,Quantinuum System Model H2,15,13,439,3042,160,780,179,1310,algorithm_step_1,780,algorithm_step_1,0.14047000000000195
+MSQLBM,8x8,0,1,Neutral-atom Rydberg processor,15,13,439,2739,160,996,179,1310,algorithm_step_1,996,measurement,0.005
+MSQLBM,8x8,0,1,Tunnel Falls,15,13,439,3070,160,996,179,1402,algorithm_step_1,996,algorithm_step_1,0.00042160000000000727
+MSQLBM,16x16,0,1,Willow (Chip 2),17,17,659,35435,304,6552,235,15771,algorithm_step_1,6552,algorithm_step_1,0.000889414999999978
+MSQLBM,16x16,0,1,Nighthawk r1,17,17,659,10585,304,3324,235,4672,algorithm_step_1,3324,algorithm_step_1,0.0005938300000000228
+MSQLBM,16x16,0,1,IBM Eagle r3,17,18,659,21893,304,3834,235,8626,algorithm_step_1,3834,algorithm_step_1,0.0023782949999998112
+MSQLBM,16x16,0,1,Quantinuum System Model H2,17,15,659,4560,304,1176,235,1732,algorithm_step_1,1176,algorithm_step_1,0.19490000000000476
+MSQLBM,16x16,0,1,Neutral-atom Rydberg processor,17,15,659,4219,304,1536,235,1764,algorithm_step_1,1536,measurement,0.005
+MSQLBM,16x16,0,1,Tunnel Falls,17,15,659,4624,304,1536,235,1886,algorithm_step_1,1536,algorithm_step_1,0.0005874000000000112
+MSQLBM,32x32,0,1,Willow (Chip 2),19,21,879,48998,448,9036,291,22092,algorithm_step_1,9036,algorithm_step_1,0.0012158200000000432
+MSQLBM,32x32,0,1,Nighthawk r1,19,21,879,14349,448,4536,291,5884,algorithm_step_1,4536,algorithm_step_1,0.0007804250000000306
+MSQLBM,32x32,0,1,IBM Eagle r3,19,17,879,30175,448,5433,291,10795,algorithm_step_1,5433,algorithm_step_1,0.0032216849999995626
+MSQLBM,32x32,0,1,Quantinuum System Model H2,19,17,879,5700,448,1500,291,2154,algorithm_step_1,1500,algorithm_step_1,0.23532000000000683
+MSQLBM,32x32,0,1,Neutral-atom Rydberg processor,19,17,879,5555,448,2040,291,2218,algorithm_step_1,2040,measurement,0.005
+MSQLBM,32x32,0,1,Tunnel Falls,19,17,879,6070,448,2040,291,2370,algorithm_step_1,2040,algorithm_step_1,0.0007318000000000149

@@ -25,7 +25,17 @@ class QLBMResourceEstimator:
     def __init__(self, hardware_config: Dict[str, Any], force_no_coupling: bool = False,
     ) -> None:
         self.hardware_config = hardware_config
-        self.basis_gates = [g.lower() for g in hardware_config.get("basis_gates", [])]
+        self.hardware_basis_gates = [
+            g.lower() for g in hardware_config.get("basis_gates", [])
+        ]
+        self.transpile_basis_gates = [
+            g.lower()
+            for g in hardware_config.get(
+                "transpile_basis_gates",
+                self.hardware_basis_gates,
+            )
+        ]
+        self.basis_gates = self.transpile_basis_gates
         self.coupling_type = None if force_no_coupling else hardware_config.get("coupling_type")
         self.coupling_params = hardware_config.get("coupling_params", {})
         self.coupling_map = None if force_no_coupling else hardware_config.get("coupling_map")
@@ -34,6 +44,7 @@ class QLBMResourceEstimator:
 
         self.directed_coupling = bool(hardware_config.get("directed_coupling", False))
         self.gate_times_s = self._normalize_gate_dict(hardware_config.get("gate_times_s", {}))
+        self._apply_gate_time_aliases(hardware_config.get("gate_time_aliases", {}))
         self.measurement_time_s = hardware_config.get("measurement_time_s")
 
     def estimate(
@@ -184,7 +195,7 @@ class QLBMResourceEstimator:
     ) -> QuantumCircuit:
         """Transpile a circuit for this estimator's hardware config."""
         coupling = CouplingMap(self.coupling_map) if self.coupling_map else None
-        basis = self.basis_gates or None
+        basis = self.transpile_basis_gates or None
         return transpile(
             circuit,
             basis_gates=basis,
@@ -716,7 +727,8 @@ class QLBMResourceEstimator:
             "year_reported": self.hardware_config.get("year_reported"),
             "num_qubits": self.hardware_config.get("num_qubits"),
             "topology_num_qubits": validation["topology_num_qubits"],
-            "basis_gates": self.basis_gates,
+            "basis_gates": self.hardware_basis_gates,
+            "transpile_basis_gates": self.transpile_basis_gates,
             "coupling_type": self.coupling_type,
             "num_couplings": len(self.coupling_map or []),
             "directed_coupling": self.directed_coupling,
@@ -806,6 +818,11 @@ class QLBMResourceEstimator:
             return self._make_fake_backend_edges(
                 str(self.coupling_params["backend"])
             )
+        if self.coupling_type == "heavy_hex":
+            backend_name = self.coupling_params.get("backend")
+            if backend_name:
+                return self._make_fake_backend_edges(str(backend_name))
+            return None
         return None
 
     @staticmethod
@@ -901,6 +918,14 @@ class QLBMResourceEstimator:
     @staticmethod
     def _normalize_gate_dict(values: Dict[str, Any]) -> Dict[str, Any]:
         return {str(name).lower(): value for name, value in values.items()}
+
+    def _apply_gate_time_aliases(self, aliases: Dict[str, str]) -> None:
+        for alias_name, source_name in aliases.items():
+            alias = str(alias_name).lower()
+            source = str(source_name).lower()
+            if alias in self.gate_times_s:
+                continue
+            self.gate_times_s[alias] = self.gate_times_s.get(source)
 
     @staticmethod
     def _edge_set(coupling_map: Iterable[Iterable[int]]) -> set[Tuple[int, int]]:

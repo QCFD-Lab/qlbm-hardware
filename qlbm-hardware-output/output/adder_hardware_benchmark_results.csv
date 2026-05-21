@@ -1,5 +1,0 @@
-platform,num_qubits,depth,size,ops_per_gate,ops_1q,ops_2q,ops_other,naive_total_time_s
-spin_qubit_intel_2024,12,18,18,"{'cx': 9, 'rx': 9}",9,9,0,2.25e-06
-superconducting_google_willow_2024,10,18,18,"{'cx': 9, 'x': 9}",9,9,0,2.025e-06
-trapped_ion_oxford_2024,10,18,18,"{'cx': 9, 'rx': 9}",9,9,0,7.2e-05
-neutral_atom_aws_2023,10,18,18,"{'cx': 9, 'rx': 9}",9,9,0,7.2e-05
