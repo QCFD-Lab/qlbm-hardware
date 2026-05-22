@@ -246,6 +246,106 @@ def save_density_error_growth(
     plt.close(fig)
 
 
+def save_depolarizing_probability_sweep(
+    output_dir: Path,
+    sweep_metrics: list[dict[str, Any]],
+) -> None:
+    """Save CSV and plots for a depolarizing-probability density sweep."""
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "two_qubit_probability",
+        "single_qubit_probability",
+        "field_total_variation_distance",
+        "field_relative_l2_error",
+        "field_rmse",
+        "rho_x_sum_total_variation_distance",
+        "rho_x_mean_relative_l2_error",
+    ]
+
+    with (output_dir / "depolarizing_probability_sweep.csv").open(
+        "w", encoding="utf-8", newline=""
+    ) as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for item in sweep_metrics:
+            metrics = item["metrics"]
+            writer.writerow(
+                {
+                    "two_qubit_probability": item["two_qubit_probability"],
+                    "single_qubit_probability": item["single_qubit_probability"],
+                    **{
+                        name: metrics[name]
+                        for name in fieldnames
+                        if name
+                        not in {
+                            "two_qubit_probability",
+                            "single_qubit_probability",
+                        }
+                    },
+                }
+            )
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    probabilities = [item["two_qubit_probability"] for item in sweep_metrics]
+    tvd = [item["metrics"]["field_total_variation_distance"] for item in sweep_metrics]
+    relative_l2 = [item["metrics"]["field_relative_l2_error"] for item in sweep_metrics]
+    profile_tvd = [
+        item["metrics"]["rho_x_sum_total_variation_distance"]
+        for item in sweep_metrics
+    ]
+
+    nonzero_probabilities = [p for p in probabilities if p > 0]
+    if nonzero_probabilities:
+        positive_min = min(nonzero_probabilities)
+        x_values = [p if p > 0 else positive_min / 3 for p in probabilities]
+    else:
+        x_values = probabilities
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(x_values, tvd, marker="o", linewidth=1.8)
+    if nonzero_probabilities:
+        ax.set_xscale("log")
+    ax.set_xlabel("two-qubit depolarizing probability")
+    ax.set_ylabel("density total variation distance")
+    ax.set_title("Density sensitivity after one QLBM timestep")
+    ax.grid(True, which="both", alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(output_dir / "depolarizing_probability_vs_density_tvd.png", dpi=180)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(x_values, tvd, marker="o", linewidth=1.8, label="rho(x,y) TVD")
+    ax.plot(
+        x_values,
+        profile_tvd,
+        marker="s",
+        linewidth=1.8,
+        label="rho_x TVD",
+    )
+    ax.plot(
+        x_values,
+        relative_l2,
+        marker="^",
+        linewidth=1.8,
+        label="rho(x,y) relative L2",
+    )
+    if nonzero_probabilities:
+        ax.set_xscale("log")
+    ax.set_xlabel("two-qubit depolarizing probability")
+    ax.set_ylabel("density error vs noiseless")
+    ax.set_title("Depolarizing sweep after one QLBM timestep")
+    ax.grid(True, which="both", alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_dir / "depolarizing_probability_density_errors.png", dpi=180)
+    plt.close(fig)
+
+
 def _save_density_arrays(output_dir: Path, comparison: dict[str, Any]) -> None:
     np.savetxt(
         output_dir / "baseline_rho_xy_normalized.csv",

@@ -1,0 +1,187 @@
+{
+  "hardware": {
+    "architecture": "neutral-atom Rydberg array",
+    "basis_gates": [
+      "rx",
+      "ry",
+      "rz",
+      "cz"
+    ],
+    "coupling_type": "all_to_all",
+    "device_name": "Neutral-atom Rydberg processor",
+    "directed_coupling": false,
+    "id": "neutral_atom_evered_aws_quera_harvard_2023",
+    "num_couplings": 3540,
+    "num_qubits": 60,
+    "topology_num_qubits": 60,
+    "transpile_basis_gates": [
+      "rx",
+      "ry",
+      "rz",
+      "cz"
+    ],
+    "validation_warnings": [],
+    "year_reported": 2023
+  },
+  "label": "abqlbm_8x4_d2q9_t1_velocity_profile_comparison",
+  "logical": {
+    "depth": 64,
+    "num_1q_ops": 70,
+    "num_2q_ops": 15,
+    "num_3q_plus_ops": 30,
+    "num_barrier": 0,
+    "num_clbits": 9,
+    "num_measure": 9,
+    "num_other_ops": 0,
+    "num_qubits": 10,
+    "num_reset": 0,
+    "op_counts": {
+      "cp": 8,
+      "h": 12,
+      "mcmt": 3,
+      "mcphase": 30,
+      "measure": 9,
+      "ry": 1,
+      "swap": 4,
+      "x": 57
+    },
+    "size": 124,
+    "two_qubit_fraction": 0.13043478260869565,
+    "width": 19
+  },
+  "logical_capacity": {
+    "available_qubits": 60,
+    "logical_qubits": 10,
+    "qubit_capacity_ok": true
+  },
+  "overheads": {
+    "added_depth": 2320,
+    "added_size": 3855,
+    "added_two_qubit_gates": 1336,
+    "depth_ratio": 37.25,
+    "size_ratio": 32.08870967741935,
+    "two_qubit_gate_ratio": 90.06666666666666
+  },
+  "qlbm": {
+    "algorithm": "ABQLBM",
+    "lattice": {
+      "geometry": [],
+      "lattice": {
+        "dim": {
+          "x": 8,
+          "y": 4
+        },
+        "velocities": "D2Q9"
+      }
+    },
+    "measure_velocity_qubits": true,
+    "num_timesteps": 1,
+    "simulated_timestep": 1
+  },
+  "section_analysis": null,
+  "transpiled": {
+    "active_qubit_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "active_qubits": 9,
+    "depth": 2384,
+    "num_1q_ops": 2619,
+    "num_2q_ops": 1351,
+    "num_3q_plus_ops": 0,
+    "num_barrier": 0,
+    "num_clbits": 9,
+    "num_measure": 9,
+    "num_other_ops": 0,
+    "num_qubits": 60,
+    "num_reset": 0,
+    "op_counts": {
+      "cz": 1351,
+      "measure": 9,
+      "rx": 1208,
+      "ry": 619,
+      "rz": 792
+    },
+    "size": 3979,
+    "two_qubit_fraction": 0.34030226700251887,
+    "width": 69
+  },
+  "transpiled_circuit": {
+    "depth": 2384,
+    "num_clbits": 9,
+    "num_qubits": 60,
+    "op_counts": {
+      "cz": 1351,
+      "measure": 9,
+      "rx": 1208,
+      "ry": 619,
+      "rz": 792
+    },
+    "size": 3979
+  },
+  "transpiled_compact": {
+    "active_qubits": 9,
+    "depth": 2384,
+    "num_1q_ops": 2619,
+    "num_2q_ops": 1351,
+    "num_3q_plus_ops": 0,
+    "num_barrier": 0,
+    "num_clbits": 9,
+    "num_measure": 9,
+    "num_other_ops": 0,
+    "num_qubits": 9,
+    "num_reset": 0,
+    "op_counts": {
+      "cz": 1351,
+      "measure": 9,
+      "rx": 1208,
+      "ry": 619,
+      "rz": 792
+    },
+    "size": 3979,
+    "two_qubit_fraction": 0.34030226700251887,
+    "width": 18
+  },
+  "transpiled_compact_circuit": {
+    "depth": 2384,
+    "num_clbits": 9,
+    "num_qubits": 9,
+    "op_counts": {
+      "cz": 1351,
+      "measure": 9,
+      "rx": 1208,
+      "ry": 619,
+      "rz": 792
+    },
+    "size": 3979
+  },
+  "transpiled_compatibility": {
+    "available_qubits": 60,
+    "basis_gates_ok": true,
+    "compatible": true,
+    "coupling_map_checked": true,
+    "coupling_map_ok": true,
+    "coupling_violations": [],
+    "num_coupling_violations": 0,
+    "qubit_capacity_ok": true,
+    "unsupported_gates": [],
+    "used_qubits": 9
+  },
+  "transpiled_time": {
+    "critical_path_time_s": 0.03674797999999961,
+    "max_idle_time_s": 0.0008619399999999991,
+    "measurement_time_included": true,
+    "scheduled_duration_s": 0.006357339999999966,
+    "serial_time_s": 0.04717826,
+    "timing_model": "qiskit_asap_schedule",
+    "unknown_gate_times": [],
+    "warnings": []
+  }
+}

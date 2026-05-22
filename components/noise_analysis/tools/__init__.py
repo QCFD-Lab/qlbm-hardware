@@ -5,6 +5,7 @@ from .density_analysis import (
     compare_density_fields,
     counts_to_density_field,
     density_profiles,
+    save_depolarizing_probability_sweep,
     save_density_error_growth,
 )
 from .velocity_analysis import (
@@ -22,6 +23,7 @@ __all__ = [
     "counts_to_density_field",
     "counts_to_velocity_fields",
     "density_profiles",
+    "save_depolarizing_probability_sweep",
     "save_density_error_growth",
     "velocity_profiles",
 ]

@@ -1,0 +1,22 @@
+{
+  "exclude_y_boundary": false,
+  "metrics": {
+    "baseline_raw_mass": 4096.0,
+    "field_l1_error": 0.986328125,
+    "field_l2_error": 0.18403086469768312,
+    "field_linf_error": 0.052001953125,
+    "field_relative_l2_error": 0.636982285503271,
+    "field_rmse": 0.032532368093838936,
+    "field_total_variation_distance": 0.4931640625,
+    "noisy_raw_mass": 4096.0,
+    "raw_mass_difference": 0.0,
+    "rho_x_mean_l1_error": 0.050537109375,
+    "rho_x_mean_l2_error": 0.018100397249467524,
+    "rho_x_mean_linf_error": 0.00775146484375,
+    "rho_x_mean_relative_l2_error": 0.19478127669557763,
+    "rho_x_sum_total_variation_distance": 0.10107421875
+  },
+  "normalize": true,
+  "source": "counts",
+  "step": 1
+}

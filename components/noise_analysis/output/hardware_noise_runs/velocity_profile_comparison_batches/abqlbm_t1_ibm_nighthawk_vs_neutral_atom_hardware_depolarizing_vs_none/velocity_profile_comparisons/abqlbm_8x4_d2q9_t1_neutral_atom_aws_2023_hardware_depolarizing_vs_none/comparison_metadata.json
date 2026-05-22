@@ -1,0 +1,36 @@
+{
+  "algorithm_name": "abqlbm",
+  "analysis_kind": "final_velocity_profile_comparison",
+  "backend_method": "statevector",
+  "baseline_noise_kind": "none",
+  "case_label": "abqlbm_8x4_d2q9_t1",
+  "coherence": {
+    "t1_s": null,
+    "t2_s": 1.0
+  },
+  "exclude_x_boundary": false,
+  "exclude_y_boundary": false,
+  "final_timestep": 1,
+  "hardware_gate_fidelities": {
+    "cz": 0.995,
+    "rx": 0.9997,
+    "ry": 0.9997,
+    "rz": 1.0
+  },
+  "hardware_gate_times_s": {
+    "cz": 2.6e-07,
+    "rx": 1e-06,
+    "ry": 1e-06,
+    "rz": 0.0
+  },
+  "hardware_id": "neutral_atom_evered_aws_quera_harvard_2023",
+  "hardware_name": "neutral_atom_aws_2023",
+  "measurement": "ABGridMeasurement(measure_velocity_qubits=True)",
+  "measurement_fidelity": 0.99,
+  "noise_parameters": {},
+  "num_shots": 4096,
+  "optimization_level": 1,
+  "seed_simulator": 42,
+  "seed_transpiler": 42,
+  "selected_noise_kind": "hardware_depolarizing"
+}

@@ -1,0 +1,38 @@
+{
+  "algorithm_name": "abqlbm",
+  "analysis_kind": "final_velocity_profile_comparison",
+  "backend_method": "statevector",
+  "baseline_noise_kind": "none",
+  "case_label": "abqlbm_8x4_d2q9_t1",
+  "coherence": {
+    "t1_s": null,
+    "t2_s": null
+  },
+  "exclude_x_boundary": false,
+  "exclude_y_boundary": false,
+  "final_timestep": 1,
+  "hardware_gate_fidelities": {
+    "cz": 0.99785,
+    "rx": 0.99975,
+    "rz": 1.0,
+    "sx": 0.99975,
+    "x": 0.99975
+  },
+  "hardware_gate_times_s": {
+    "cz": 2e-07,
+    "rx": 3.5e-08,
+    "rz": 0.0,
+    "sx": 3.5e-08,
+    "x": 3.5e-08
+  },
+  "hardware_id": "ibm nighthawk r1 2025",
+  "hardware_name": "superconducting_ibm_nighthawk_r1_2025",
+  "measurement": "ABGridMeasurement(measure_velocity_qubits=True)",
+  "measurement_fidelity": 0.98022,
+  "noise_parameters": {},
+  "num_shots": 4096,
+  "optimization_level": 1,
+  "seed_simulator": 42,
+  "seed_transpiler": 42,
+  "selected_noise_kind": "hardware_depolarizing"
+}

@@ -1,0 +1,162 @@
+[
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 0.0,
+      "field_l2_error": 0.0,
+      "field_linf_error": 0.0,
+      "field_relative_l2_error": 0.0,
+      "field_rmse": 0.0,
+      "field_total_variation_distance": 0.0,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.0,
+      "rho_x_mean_l2_error": 0.0,
+      "rho_x_mean_linf_error": 0.0,
+      "rho_x_mean_relative_l2_error": 0.0,
+      "rho_x_sum_total_variation_distance": 0.0
+    },
+    "single_qubit_probability": 0.0,
+    "two_qubit_probability": 0.0
+  },
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 0.04150390625,
+      "field_l2_error": 0.013282686043686957,
+      "field_linf_error": 0.006591796875,
+      "field_relative_l2_error": 0.04598701286420165,
+      "field_rmse": 0.00234806934346574,
+      "field_total_variation_distance": 0.020751953125,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.0086669921875,
+      "rho_x_mean_l2_error": 0.0032970285244310316,
+      "rho_x_mean_linf_error": 0.00177001953125,
+      "rho_x_mean_relative_l2_error": 0.035308889053953935,
+      "rho_x_sum_total_variation_distance": 0.017333984375
+    },
+    "single_qubit_probability": 1.0000000000000002e-06,
+    "two_qubit_probability": 1e-05
+  },
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 0.05078125,
+      "field_l2_error": 0.013789083248479432,
+      "field_linf_error": 0.007568359375,
+      "field_relative_l2_error": 0.04774024972417061,
+      "field_rmse": 0.0024375885678364086,
+      "field_total_variation_distance": 0.025390625,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.0086669921875,
+      "rho_x_mean_l2_error": 0.00345482707472776,
+      "rho_x_mean_linf_error": 0.00201416015625,
+      "rho_x_mean_relative_l2_error": 0.03699880209656659,
+      "rho_x_sum_total_variation_distance": 0.017333984375
+    },
+    "single_qubit_probability": 3e-06,
+    "two_qubit_probability": 3e-05
+  },
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 0.068359375,
+      "field_l2_error": 0.01725989613489613,
+      "field_linf_error": 0.0087890625,
+      "field_relative_l2_error": 0.059756818988242213,
+      "field_rmse": 0.0030511473998901337,
+      "field_total_variation_distance": 0.0341796875,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.0079345703125,
+      "rho_x_mean_l2_error": 0.003013678441315554,
+      "rho_x_mean_linf_error": 0.00146484375,
+      "rho_x_mean_relative_l2_error": 0.03227440616306674,
+      "rho_x_sum_total_variation_distance": 0.015869140625
+    },
+    "single_qubit_probability": 1e-05,
+    "two_qubit_probability": 0.0001
+  },
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 0.2080078125,
+      "field_l2_error": 0.0442938651217836,
+      "field_linf_error": 0.01953125,
+      "field_relative_l2_error": 0.15335321022127152,
+      "field_rmse": 0.007830123098143871,
+      "field_total_variation_distance": 0.10400390625,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.010009765625,
+      "rho_x_mean_l2_error": 0.004098000569236943,
+      "rho_x_mean_linf_error": 0.00238037109375,
+      "rho_x_mean_relative_l2_error": 0.04388674419102803,
+      "rho_x_sum_total_variation_distance": 0.02001953125
+    },
+    "single_qubit_probability": 2.9999999999999997e-05,
+    "two_qubit_probability": 0.0003
+  },
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 0.50634765625,
+      "field_l2_error": 0.10470986198607825,
+      "field_linf_error": 0.039794921875,
+      "field_relative_l2_error": 0.362524097484875,
+      "field_rmse": 0.018510263366865856,
+      "field_total_variation_distance": 0.253173828125,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.0106201171875,
+      "rho_x_mean_l2_error": 0.0048828125,
+      "rho_x_mean_linf_error": 0.0029296875,
+      "rho_x_mean_relative_l2_error": 0.052291535713513936,
+      "rho_x_sum_total_variation_distance": 0.021240234375
+    },
+    "single_qubit_probability": 0.0001,
+    "two_qubit_probability": 0.001
+  },
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 0.92138671875,
+      "field_l2_error": 0.1730214808584181,
+      "field_linf_error": 0.05224609375,
+      "field_relative_l2_error": 0.5990310272974494,
+      "field_rmse": 0.030586165601481467,
+      "field_total_variation_distance": 0.460693359375,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.0455322265625,
+      "rho_x_mean_l2_error": 0.016438978339027768,
+      "rho_x_mean_linf_error": 0.0072021484375,
+      "rho_x_mean_relative_l2_error": 0.17605005781175348,
+      "rho_x_sum_total_variation_distance": 0.091064453125
+    },
+    "single_qubit_probability": 0.00030000000000000003,
+    "two_qubit_probability": 0.003
+  },
+  {
+    "metrics": {
+      "baseline_raw_mass": 4096.0,
+      "field_l1_error": 1.20361328125,
+      "field_l2_error": 0.22047344848903566,
+      "field_linf_error": 0.0576171875,
+      "field_relative_l2_error": 0.7633181480412272,
+      "field_rmse": 0.03897456762454502,
+      "field_total_variation_distance": 0.601806640625,
+      "noisy_raw_mass": 4096.0,
+      "raw_mass_difference": 0.0,
+      "rho_x_mean_l1_error": 0.0821533203125,
+      "rho_x_mean_l2_error": 0.029238706699045887,
+      "rho_x_mean_linf_error": 0.012451171875,
+      "rho_x_mean_relative_l2_error": 0.31312627211676,
+      "rho_x_sum_total_variation_distance": 0.164306640625
+    },
+    "single_qubit_probability": 0.001,
+    "two_qubit_probability": 0.01
+  }
+]

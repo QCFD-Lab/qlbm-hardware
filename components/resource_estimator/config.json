@@ -1,4 +1,40 @@
 {
+  "hypothetical_2d_nn_rz_sx_x_cx": {
+    "id": "hypothetical 2d nearest-neighbor rz sx x cx",
+    "architecture": "hypothetical superconducting-style nearest-neighbor grid",
+    "device_name": "Hypothetical 2D NN CX",
+    "year_reported": 2026,
+    "num_qubits": 64,
+    "basis_gates": [
+      "rz",
+      "sx",
+      "x",
+      "cx"
+    ],
+    "coupling_type": "2d_grid",
+    "coupling_params": {
+      "rows": 8,
+      "cols": 8
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "sx": 25e-9,
+      "x": 25e-9,
+      "cx": 200e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "sx": 1.0,
+      "x": 1.0,
+      "cx": 1.0
+    },
+    "measurement_time_s": 1e-6,
+    "measurement_fidelity": 1.0,
+    "coherence": {
+      "t1_s": 100e-6,
+      "t2_s": 80e-6
+    }
+  },
   "superconducting_google_willow_2024": {
     "id": "google willow chip 2 2024",
     "architecture": "superconducting transmon",

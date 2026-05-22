@@ -1,0 +1,109 @@
+{
+  "algorithm_name": "abqlbm",
+  "analysis_kind": "multi_hardware_velocity_profile_comparison",
+  "backend_method": "statevector",
+  "baseline_noise_kind": "none",
+  "case_label": "abqlbm_8x4_d2q9_t3",
+  "exclude_x_boundary": false,
+  "exclude_y_boundary": false,
+  "hardware_config_overrides": {
+    "neutral_atom_aws_2023": {
+      "coherence": {
+        "t1_s": 4.0,
+        "t2_s": 1.0
+      }
+    }
+  },
+  "hardware_configs_used": {
+    "neutral_atom_aws_2023": {
+      "architecture": "neutral-atom Rydberg array",
+      "basis_gates": [
+        "rx",
+        "ry",
+        "rz",
+        "cz"
+      ],
+      "coherence": {
+        "t1_s": 4.0,
+        "t2_s": 1.0
+      },
+      "coupling_params": {
+        "max_parallel_cz_qubits": 60
+      },
+      "coupling_type": "all_to_all",
+      "device_name": "Neutral-atom Rydberg processor",
+      "gate_fidelities": {
+        "cz": 0.995,
+        "rx": 0.9997,
+        "ry": 0.9997,
+        "rz": 1.0
+      },
+      "gate_times_s": {
+        "cz": 2.6e-07,
+        "rx": 1e-06,
+        "ry": 1e-06,
+        "rz": 0.0
+      },
+      "id": "neutral_atom_evered_aws_quera_harvard_2023",
+      "measurement_fidelity": 0.99,
+      "measurement_time_s": 0.005,
+      "num_qubits": 60,
+      "year_reported": 2023
+    },
+    "superconducting_ibm_eagle_r3_2024": {
+      "architecture": "superconducting fixed-frequency transmon",
+      "basis_gates": [
+        "rz",
+        "sx",
+        "x",
+        "ecr"
+      ],
+      "coherence": {
+        "t1_s": 0.000214,
+        "t2_s": 0.000192
+      },
+      "coupling_params": {
+        "backend": "FakeKyoto"
+      },
+      "coupling_type": "heavy_hex",
+      "device_name": "IBM Eagle r3",
+      "gate_fidelities": {
+        "ecr": 0.9911,
+        "rz": 1.0,
+        "sx": 0.99976,
+        "x": 0.99976
+      },
+      "gate_times_s": {
+        "ecr": 6.6e-07,
+        "rz": 0.0,
+        "sx": 3.5e-08,
+        "x": 3.5e-08
+      },
+      "id": "ibm eagle r3 representative 2024",
+      "measurement_fidelity": 0.9865,
+      "measurement_time_s": 1e-06,
+      "num_qubits": 127,
+      "year_reported": 2024
+    }
+  },
+  "hardware_ids": {
+    "neutral_atom_aws_2023": "neutral_atom_evered_aws_quera_harvard_2023",
+    "superconducting_ibm_eagle_r3_2024": "ibm eagle r3 representative 2024"
+  },
+  "hardware_names": [
+    "superconducting_ibm_eagle_r3_2024",
+    "neutral_atom_aws_2023"
+  ],
+  "measurement": "ABGridMeasurement(measure_velocity_qubits=True)",
+  "noise_parameters": {},
+  "num_shots": 4096,
+  "optimization_level": 1,
+  "plot_note": "Combined plots use the first hardware's noiseless result as the visual reference curve; per-hardware error metrics use each hardware's own noiseless sampled run as baseline.",
+  "seed_simulator": 42,
+  "seed_transpiler": 42,
+  "selected_noise_kind": "thermal_relaxation",
+  "timesteps": [
+    1,
+    3
+  ]
+}

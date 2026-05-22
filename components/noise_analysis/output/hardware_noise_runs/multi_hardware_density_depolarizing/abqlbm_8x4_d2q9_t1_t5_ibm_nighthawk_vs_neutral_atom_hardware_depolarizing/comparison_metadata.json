@@ -1,0 +1,106 @@
+{
+  "algorithm_name": "abqlbm",
+  "analysis_kind": "multi_hardware_density_depolarizing_comparison",
+  "backend_method": "statevector",
+  "baseline_noise_kind": "none",
+  "case_label": "abqlbm_8x4_d2q9_t5",
+  "exclude_y_boundary": false,
+  "hardware_configs_used": {
+    "neutral_atom_aws_2023": {
+      "architecture": "neutral-atom Rydberg array",
+      "basis_gates": [
+        "rx",
+        "ry",
+        "rz",
+        "cz"
+      ],
+      "coherence": {
+        "t1_s": null,
+        "t2_s": 1.0
+      },
+      "coupling_params": {
+        "max_parallel_cz_qubits": 60
+      },
+      "coupling_type": "all_to_all",
+      "device_name": "Neutral-atom Rydberg processor",
+      "gate_fidelities": {
+        "cz": 0.995,
+        "rx": 0.9997,
+        "ry": 0.9997,
+        "rz": 1.0
+      },
+      "gate_times_s": {
+        "cz": 2.6e-07,
+        "rx": 1e-06,
+        "ry": 1e-06,
+        "rz": 0.0
+      },
+      "id": "neutral_atom_evered_aws_quera_harvard_2023",
+      "measurement_fidelity": 0.99,
+      "measurement_time_s": 0.005,
+      "num_qubits": 60,
+      "year_reported": 2023
+    },
+    "superconducting_ibm_nighthawk_r1_2025": {
+      "architecture": "superconducting fixed-frequency transmon with tunable couplers",
+      "basis_gates": [
+        "rz",
+        "sx",
+        "x",
+        "cz",
+        "rx"
+      ],
+      "coherence": {
+        "t1_s": null,
+        "t2_s": null
+      },
+      "coupling_params": {
+        "cols": 12,
+        "rows": 10
+      },
+      "coupling_type": "2d_grid",
+      "device_name": "Nighthawk r1",
+      "gate_fidelities": {
+        "cz": 0.99785,
+        "rx": 0.99975,
+        "rz": 1.0,
+        "sx": 0.99975,
+        "x": 0.99975
+      },
+      "gate_times_s": {
+        "cz": 2e-07,
+        "rx": 3.5e-08,
+        "rz": 0.0,
+        "sx": 3.5e-08,
+        "x": 3.5e-08
+      },
+      "id": "ibm nighthawk r1 2025",
+      "measurement_fidelity": 0.98022,
+      "measurement_time_s": null,
+      "num_qubits": 120,
+      "year_reported": 2025
+    }
+  },
+  "hardware_ids": {
+    "neutral_atom_aws_2023": "neutral_atom_evered_aws_quera_harvard_2023",
+    "superconducting_ibm_nighthawk_r1_2025": "ibm nighthawk r1 2025"
+  },
+  "hardware_names": [
+    "superconducting_ibm_nighthawk_r1_2025",
+    "neutral_atom_aws_2023"
+  ],
+  "max_timesteps": 5,
+  "num_shots": 4096,
+  "optimization_level": 1,
+  "plot_note": "Error-growth metrics compare each noisy hardware run against that hardware's own noiseless transpiled baseline. The final density-profile overlay uses the first hardware's noiseless profile as a visual reference.",
+  "seed_simulator": 42,
+  "seed_transpiler": 42,
+  "selected_noise_kind": "hardware_depolarizing",
+  "simulated_timesteps": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ]
+}

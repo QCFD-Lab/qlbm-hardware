@@ -10,8 +10,8 @@ from qiskit_aer.noise import (
     thermal_relaxation_error,
 )
 
-ONE_QUBIT_GATES = ["id", "x", "y", "z", "sx", "h", "rz"]
-TWO_QUBIT_GATES = ["cx", "cz", "swap", "cp"]
+ONE_QUBIT_GATES = ["id", "x", "y", "z", "sx", "h", "rx", "ry", "rz", "rxy"]
+TWO_QUBIT_GATES = ["cx", "cz", "swap", "cp", "iswap", "ecr", "rzz", "zz"]
 NOISE_KINDS = {
     "none",
     "depolarizing",
@@ -28,10 +28,15 @@ GATE_ARITIES = {
     "rx": 1,
     "ry": 1,
     "rz": 1,
+    "rxy": 1,
     "cx": 2,
     "cz": 2,
     "swap": 2,
     "cp": 2,
+    "iswap": 2,
+    "ecr": 2,
+    "rzz": 2,
+    "zz": 2,
 }
 
 

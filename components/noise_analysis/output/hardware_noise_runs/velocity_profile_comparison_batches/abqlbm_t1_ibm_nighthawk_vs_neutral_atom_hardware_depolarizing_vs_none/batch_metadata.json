@@ -1,0 +1,20 @@
+{
+  "algorithm_name": "abqlbm",
+  "analysis_kind": "velocity_profile_comparison_batch",
+  "backend_method": "statevector",
+  "final_timestep": 1,
+  "hardware_names": [
+    "superconducting_ibm_nighthawk_r1_2025",
+    "neutral_atom_aws_2023"
+  ],
+  "noise_kind": "hardware_depolarizing",
+  "noise_parameters": {},
+  "num_shots": 4096,
+  "optimization_level": 1,
+  "output_dirs": [
+    "/Users/daglarcoban/Projects/MEP/qlbm-hardware/components/noise_analysis/output/hardware_noise_runs/velocity_profile_comparison_batches/abqlbm_t1_ibm_nighthawk_vs_neutral_atom_hardware_depolarizing_vs_none/velocity_profile_comparisons/abqlbm_8x4_d2q9_t1_superconducting_ibm_nighthawk_r1_2025_hardware_depolarizing_vs_none",
+    "/Users/daglarcoban/Projects/MEP/qlbm-hardware/components/noise_analysis/output/hardware_noise_runs/velocity_profile_comparison_batches/abqlbm_t1_ibm_nighthawk_vs_neutral_atom_hardware_depolarizing_vs_none/velocity_profile_comparisons/abqlbm_8x4_d2q9_t1_neutral_atom_aws_2023_hardware_depolarizing_vs_none"
+  ],
+  "seed_simulator": 42,
+  "seed_transpiler": 42
+}
