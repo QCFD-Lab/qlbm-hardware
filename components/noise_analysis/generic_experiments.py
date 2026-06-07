@@ -66,14 +66,20 @@ def run_hardware_noise_analysis(
         ),
     )
 
-    qlbm_result = final_case.lattice.create_result(str(output_dir), "step")
-    qlbm_result.visualize_geometry()
+    qlbm_result = None
+    if algorithm_name != "spacetime":
+        qlbm_result = final_case.lattice.create_result(str(output_dir), "step")
+        qlbm_result.visualize_geometry()
 
     step_reports = []
     final_report = None
     for timestep in range(0, max_timesteps + 1):
         case_timesteps = timestep if timestep > 0 else 1
         case = build_case(algorithm_name, case_timesteps)
+        timestep_result = qlbm_result
+        if timestep_result is None:
+            timestep_result = case.lattice.create_result(str(output_dir), "step")
+            timestep_result.visualize_geometry()
         logical_steps = case.runner_steps if timestep > 0 else 0
         logical_circuit = build_full_logical_circuit(case, logical_steps)
         report = estimator.estimate(
@@ -91,7 +97,7 @@ def run_hardware_noise_analysis(
         counts = sample_counts(backend, transpiled_compact_circuit, num_shots)
 
         write_json(output_dir / f"counts_step_{timestep}.json", counts)
-        qlbm_result.save_timestep_counts(counts, timestep)
+        timestep_result.save_timestep_counts(counts, timestep)
         write_json(output_dir / f"resource_report_step_{timestep}.json", report)
         step_reports.append({"timestep": timestep, "report": report})
 
