@@ -1,43 +1,27 @@
 """Qiskit Aer noise-model builders for QLBM noise experiments."""
 
 from __future__ import annotations
-
 from typing import Any
+from qiskit_aer.noise import NoiseModel, depolarizing_error, thermal_relaxation_error
 
-from qiskit_aer.noise import (
-    NoiseModel,
-    depolarizing_error,
-    thermal_relaxation_error,
-)
-
-ONE_QUBIT_GATES = ["id", "x", "y", "z", "sx", "h", "rx", "ry", "rz", "rxy"]
-TWO_QUBIT_GATES = ["cx", "cz", "swap", "cp", "iswap", "ecr", "rzz", "zz"]
+GATES_BY_ARITY = {
+    1: ["id", "x", "y", "z", "sx", "h", "rx", "ry", "rz", "rxy"],
+    2: ["cx", "cz", "swap", "cp", "iswap", "ecr", "rzz", "zz"],
+}
 NOISE_KINDS = {
     "none",
     "depolarizing",
     "hardware_depolarizing",
     "thermal_relaxation",
 }
-GATE_ARITIES = {
-    "id": 1,
-    "x": 1,
-    "y": 1,
-    "z": 1,
-    "sx": 1,
-    "h": 1,
-    "rx": 1,
-    "ry": 1,
-    "rz": 1,
-    "rxy": 1,
-    "cx": 2,
-    "cz": 2,
-    "swap": 2,
-    "cp": 2,
-    "iswap": 2,
-    "ecr": 2,
-    "rzz": 2,
-    "zz": 2,
-}
+
+
+def gate_arity(gate_name: str) -> int | None:
+    """Return the supported gate arity, or None for gates that are not not modeled"""
+    for arity, gate_names in GATES_BY_ARITY.items():
+        if gate_name in gate_names:
+            return arity
+    return None
 
 
 def _validate_probability(name: str, value: float) -> None:
@@ -47,7 +31,6 @@ def _validate_probability(name: str, value: float) -> None:
 
 def fidelity_to_depolarizing_probability(fidelity: float, num_qubits: int) -> float:
     """Convert average gate fidelity to Qiskit depolarizing probability."""
-
     _validate_probability("fidelity", fidelity)
     if num_qubits < 1:
         raise ValueError("num_qubits must be positive.")
@@ -56,21 +39,20 @@ def fidelity_to_depolarizing_probability(fidelity: float, num_qubits: int) -> fl
     return min(1.0, max(0.0, probability))
 
 
-def build_hardware_depolarizing_noise_model(
-    hardware_config: dict[str, Any],
-) -> NoiseModel:
-    """Build gate depolarizing errors from hardware ``gate_fidelities``."""
-
+def build_hardware_depolarizing_noise_model(hardware_config: dict[str, Any]) -> NoiseModel:
+    """Build gate depolarizing errors from hardware gate_fidelities."""
     gate_fidelities = {
         str(name).lower(): fidelity
         for name, fidelity in hardware_config.get("gate_fidelities", {}).items()
     }
     if not gate_fidelities:
-        raise ValueError("hardware_depolarizing requires gate_fidelities in hardware_config.")
+        raise ValueError(
+            "hardware_depolarizing requires gate_fidelities in hardware_config."
+        )
 
     noise_model = NoiseModel()
     for gate_name, fidelity in gate_fidelities.items():
-        arity = GATE_ARITIES.get(gate_name)
+        arity = gate_arity(gate_name)
         if arity is None:
             continue
         probability = fidelity_to_depolarizing_probability(float(fidelity), arity)
@@ -105,9 +87,7 @@ def _hardware_t1_t2(hardware_config: dict[str, Any]) -> tuple[float, float]:
     return t1, t2
 
 
-def build_thermal_relaxation_noise_model(
-    hardware_config: dict[str, Any],
-) -> NoiseModel:
+def build_thermal_relaxation_noise_model(hardware_config: dict[str, Any]) -> NoiseModel:
     """Build thermal relaxation errors from hardware T1/T2 and gate times."""
 
     t1, t2 = _hardware_t1_t2(hardware_config)
@@ -123,14 +103,18 @@ def build_thermal_relaxation_noise_model(
 
     noise_model = NoiseModel()
     for gate_name in basis_gates:
-        arity = GATE_ARITIES.get(gate_name)
+        arity = gate_arity(gate_name)
         if arity is None:
             continue
         if gate_name not in gate_times:
-            raise ValueError(f"thermal_relaxation requires a gate time for {gate_name!r}.")
+            raise ValueError(
+                f"thermal_relaxation requires a gate time for {gate_name!r}."
+            )
         gate_time = gate_times[gate_name]
         if gate_time < 0:
-            raise ValueError(f"thermal_relaxation gate time for {gate_name!r} must be >= 0.")
+            raise ValueError(
+                f"thermal_relaxation gate time for {gate_name!r} must be >= 0."
+            )
         if gate_time == 0.0:
             continue
 
@@ -152,13 +136,15 @@ def build_noise_model(
     two_qubit_probability: float = 0.01,
     hardware_config: dict[str, Any] | None = None,
 ):
-    """Build a Qiskit Aer ``NoiseModel`` or return ``None`` for noiseless runs."""
+    """Build a Qiskit Aer NoiseModel or return None for noiseless runs."""
 
     if kind == "none":
         return None
 
     if kind not in NOISE_KINDS:
-        raise ValueError(f"Unsupported noise kind {kind!r}; expected one of {sorted(NOISE_KINDS)}.")
+        raise ValueError(
+            f"Unsupported noise kind {kind!r}; expected one of {sorted(NOISE_KINDS)}."
+        )
 
     if kind == "hardware_depolarizing":
         if hardware_config is None:
@@ -184,6 +170,6 @@ def build_noise_model(
     else:
         raise ValueError(f"Unsupported noise kind {kind!r}.")
 
-    noise_model.add_all_qubit_quantum_error(one_qubit, ONE_QUBIT_GATES)
-    noise_model.add_all_qubit_quantum_error(two_qubit, TWO_QUBIT_GATES)
+    noise_model.add_all_qubit_quantum_error(one_qubit, GATES_BY_ARITY[1])
+    noise_model.add_all_qubit_quantum_error(two_qubit, GATES_BY_ARITY[2])
     return noise_model
