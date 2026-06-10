@@ -1,13 +1,17 @@
 """Focused tests for Qiskit count decoding in noise-analysis tools."""
 
 from __future__ import annotations
+import numpy as np
 import pytest
 from components.noise_analysis.tools.count_decoding import (
     decode_grid_count,
     decode_grid_velocity_count,
 )
 from components.noise_analysis.tools.density_analysis import counts_to_density_field
-from components.noise_analysis.tools.velocity_analysis import counts_to_velocity_fields
+from components.noise_analysis.tools.velocity_analysis import (
+    counts_to_velocity_fields,
+    velocity_profiles,
+)
 from qlbm.lattice import ABLattice
 
 
@@ -101,6 +105,51 @@ def test_velocity_count_decoding_uses_classical_bit_order(
     assert decoded.velocity == velocity
     assert fields["populations"][x, y, velocity] == 7
     assert fields["populations"].sum() == 7
+
+
+def test_velocity_fields_use_channel_masses_for_density(
+    ab_lattice: ABLattice,
+) -> None:
+    rest_key = _qiskit_count_key(ab_lattice, x=2, y=1, velocity=0)
+    moving_key = _qiskit_count_key(ab_lattice, x=2, y=1, velocity=1)
+
+    fields = counts_to_velocity_fields(
+        {rest_key: 3, moving_key: 5},
+        ab_lattice,
+        normalize=False,
+    )
+
+    assert fields["rho_xy"][2, 1] == 11
+    assert fields["momentum_x"][2, 1] == 5
+    assert fields["ux_xy"][2, 1] == pytest.approx(5 / 11)
+
+
+def test_velocity_fields_track_invalid_velocity_states(
+    ab_lattice: ABLattice,
+) -> None:
+    invalid_key = _qiskit_count_key(ab_lattice, x=3, y=2, velocity=12)
+
+    fields = counts_to_velocity_fields({invalid_key: 9}, ab_lattice, normalize=False)
+
+    assert fields["populations"].sum() == 0
+    assert fields["invalid_velocity_xy"][3, 2] == 9
+    assert float(fields["valid_velocity_raw_mass"]) == 0
+    assert float(fields["invalid_velocity_raw_mass"]) == 9
+
+
+def test_velocity_profiles_include_density_weighted_cross_sections() -> None:
+    fields = {
+        "rho_xy": np.array([[0.9, 0.01]]),
+        "momentum_x": np.array([[0.09, 0.01]]),
+        "momentum_y": np.zeros((1, 2)),
+        "ux_xy": np.array([[0.1, 1.0]]),
+        "uy_xy": np.zeros((1, 2)),
+    }
+
+    profiles = velocity_profiles(fields)
+
+    assert profiles["ux_x_mean"][0] == pytest.approx(0.55)
+    assert profiles["ux_x_density_weighted"][0] == pytest.approx(0.10 / 0.91)
 
 
 def test_density_decoding_ignores_extra_high_classical_bits(

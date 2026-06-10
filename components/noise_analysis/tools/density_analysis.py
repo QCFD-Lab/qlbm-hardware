@@ -80,12 +80,25 @@ def compare_density_fields(
         noisy_field,
         normalize=normalize,
     )
-    profile_difference = noisy_profiles["rho_x_mean"] - baseline_profiles["rho_x_mean"]
+    mean_profile_difference = (
+        noisy_profiles["rho_x_mean"] - baseline_profiles["rho_x_mean"]
+    )
+    marginal_profile_difference = (
+        noisy_profiles["rho_x_sum"] - baseline_profiles["rho_x_sum"]
+    )
 
     l2 = float(np.linalg.norm(difference.ravel(), ord=2))
     baseline_l2 = float(np.linalg.norm(baseline_density.ravel(), ord=2))
-    profile_l2 = float(np.linalg.norm(profile_difference, ord=2))
-    baseline_profile_l2 = float(np.linalg.norm(baseline_profiles["rho_x_mean"], ord=2))
+    mean_profile_l2 = float(np.linalg.norm(mean_profile_difference, ord=2))
+    baseline_mean_profile_l2 = float(
+        np.linalg.norm(baseline_profiles["rho_x_mean"], ord=2)
+    )
+    marginal_profile_l2 = float(
+        np.linalg.norm(marginal_profile_difference, ord=2)
+    )
+    baseline_marginal_profile_l2 = float(
+        np.linalg.norm(baseline_profiles["rho_x_sum"], ord=2)
+    )
 
     return {
         "baseline_density": baseline_density,
@@ -103,12 +116,26 @@ def compare_density_fields(
             "field_relative_l2_error": l2 / baseline_l2 if baseline_l2 > 0 else 0.0,
             "field_rmse": float(np.sqrt(np.mean(difference**2))),
             "field_linf_error": float(np.max(np.abs(difference))),
-            "rho_x_mean_l1_error": float(np.sum(np.abs(profile_difference))),
-            "rho_x_mean_l2_error": profile_l2,
+            "rho_x_mean_l1_error": float(np.sum(np.abs(mean_profile_difference))),
+            "rho_x_mean_l2_error": mean_profile_l2,
             "rho_x_mean_relative_l2_error": (
-                profile_l2 / baseline_profile_l2 if baseline_profile_l2 > 0 else 0.0
+                mean_profile_l2 / baseline_mean_profile_l2
+                if baseline_mean_profile_l2 > 0
+                else 0.0
             ),
-            "rho_x_mean_linf_error": float(np.max(np.abs(profile_difference))),
+            "rho_x_mean_linf_error": float(np.max(np.abs(mean_profile_difference))),
+            "rho_x_sum_l1_error": float(
+                np.sum(np.abs(marginal_profile_difference))
+            ),
+            "rho_x_sum_l2_error": marginal_profile_l2,
+            "rho_x_sum_relative_l2_error": (
+                marginal_profile_l2 / baseline_marginal_profile_l2
+                if baseline_marginal_profile_l2 > 0
+                else 0.0
+            ),
+            "rho_x_sum_linf_error": float(
+                np.max(np.abs(marginal_profile_difference))
+            ),
             "rho_x_sum_total_variation_distance": float(
                 0.5
                 * np.sum(
@@ -172,6 +199,7 @@ def save_density_error_growth(output_dir: Path, step_metrics: list[dict[str, Any
         "field_relative_l2_error",
         "field_rmse",
         "rho_x_sum_total_variation_distance",
+        "rho_x_sum_relative_l2_error",
         "rho_x_mean_relative_l2_error",
     ]
     with csv_path.open("w", encoding="utf-8", newline="") as file:
@@ -218,7 +246,16 @@ def save_density_error_growth(output_dir: Path, step_metrics: list[dict[str, Any
     plt.close(fig)
 
 
-def save_depolarizing_probability_sweep(output_dir: Path, sweep_metrics: list[dict[str, Any]]) -> None:
+def _timestep_phrase(timestep: int) -> str:
+    unit = "timestep" if timestep == 1 else "timesteps"
+    return f"{timestep} QLBM {unit}"
+
+
+def save_depolarizing_probability_sweep(
+    output_dir: Path,
+    sweep_metrics: list[dict[str, Any]],
+    timestep: int,
+) -> None:
     """Save CSV and plots for a depolarizing-probability density sweep."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -229,6 +266,7 @@ def save_depolarizing_probability_sweep(output_dir: Path, sweep_metrics: list[di
         "field_relative_l2_error",
         "field_rmse",
         "rho_x_sum_total_variation_distance",
+        "rho_x_sum_relative_l2_error",
         "rho_x_mean_relative_l2_error",
     ]
 
@@ -280,7 +318,7 @@ def save_depolarizing_probability_sweep(output_dir: Path, sweep_metrics: list[di
         ax.set_xscale("log")
     ax.set_xlabel("two-qubit depolarizing probability")
     ax.set_ylabel("density total variation distance")
-    ax.set_title("Density sensitivity after one QLBM timestep")
+    ax.set_title(f"Density sensitivity after {_timestep_phrase(timestep)}")
     ax.grid(True, which="both", alpha=0.25)
     fig.tight_layout()
     fig.savefig(output_dir / "depolarizing_probability_vs_density_tvd.png", dpi=180)
@@ -306,7 +344,7 @@ def save_depolarizing_probability_sweep(output_dir: Path, sweep_metrics: list[di
         ax.set_xscale("log")
     ax.set_xlabel("two-qubit depolarizing probability")
     ax.set_ylabel("density error vs noiseless")
-    ax.set_title("Depolarizing sweep after one QLBM timestep")
+    ax.set_title(f"Depolarizing sweep after {_timestep_phrase(timestep)}")
     ax.grid(True, which="both", alpha=0.25)
     ax.legend()
     fig.tight_layout()
@@ -335,8 +373,8 @@ def _save_density_arrays(output_dir: Path, comparison: dict[str, Any]) -> None:
 def _save_profile_csv(output_dir: Path, comparison: dict[str, Any], step: int) -> None:
     baseline_profiles = comparison["baseline_profiles"]
     noisy_profiles = comparison["noisy_profiles"]
-    baseline_profile = baseline_profiles["rho_x_mean"]
-    noisy_profile = noisy_profiles["rho_x_mean"]
+    baseline_profile = baseline_profiles["rho_x_sum"]
+    noisy_profile = noisy_profiles["rho_x_sum"]
 
     with (output_dir / f"rho_x_comparison_step_{step}.csv").open(
         "w", encoding="utf-8", newline=""
@@ -345,12 +383,12 @@ def _save_profile_csv(output_dir: Path, comparison: dict[str, Any], step: int) -
         writer.writerow(
             [
                 "x",
-                "baseline_rho_x_mean",
-                "noisy_rho_x_mean",
-                "signed_error",
-                "absolute_error",
                 "baseline_rho_x_sum",
                 "noisy_rho_x_sum",
+                "signed_error",
+                "absolute_error",
+                "baseline_rho_x_mean",
+                "noisy_rho_x_mean",
                 "baseline_rho_x_centerline",
                 "noisy_rho_x_centerline",
             ]
@@ -364,8 +402,8 @@ def _save_profile_csv(output_dir: Path, comparison: dict[str, Any], step: int) -
                     noisy_profile[x_index],
                     signed_error,
                     abs(signed_error),
-                    baseline_profiles["rho_x_sum"][x_index],
-                    noisy_profiles["rho_x_sum"][x_index],
+                    baseline_profiles["rho_x_mean"][x_index],
+                    noisy_profiles["rho_x_mean"][x_index],
                     baseline_profiles["rho_x_centerline"][x_index],
                     noisy_profiles["rho_x_centerline"][x_index],
                 ]
@@ -392,8 +430,8 @@ def _save_density_plots(
 
     baseline_profiles = comparison["baseline_profiles"]
     noisy_profiles = comparison["noisy_profiles"]
-    baseline_profile = baseline_profiles["rho_x_mean"]
-    noisy_profile = noisy_profiles["rho_x_mean"]
+    baseline_profile = baseline_profiles["rho_x_sum"]
+    noisy_profile = noisy_profiles["rho_x_sum"]
     x_values = np.arange(len(baseline_profile))
     difference = noisy_profile - baseline_profile
 
@@ -401,7 +439,7 @@ def _save_density_plots(
     ax.plot(x_values, baseline_profile, marker="o", linewidth=1.8, label=baseline_label)
     ax.plot(x_values, noisy_profile, marker="s", linewidth=1.8, label=noisy_label)
     ax.set_xlabel("x")
-    ax.set_ylabel("mean normalized density rho(x)")
+    ax.set_ylabel("normalized marginal density rho_x(x)")
     ax.set_title(f"Density profile at timestep {step}")
     ax.grid(True, alpha=0.25)
     ax.legend()

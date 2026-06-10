@@ -231,18 +231,16 @@ def build_case(algorithm_name: str, num_timesteps: int, measure_velocity_qubits:
     return CASE_BUILDERS[algorithm_name](num_timesteps=num_timesteps)
 
 
-def _hardware_slug(hardware_name: str) -> str:
-    if "ibm_nighthawk" in hardware_name:
-        return "ibm_nighthawk"
-    if "ibm_eagle" in hardware_name:
-        return "ibm_eagle"
-    if "neutral_atom" in hardware_name:
-        return "neutral_atom"
-    return (
-        hardware_name.replace("superconducting_", "")
-        .replace("_2024", "")
-        .replace("_2023", "")
-    )
+def safe_path_name(value: str) -> str:
+    """Return a lowercase filesystem-safe name without shortening the input."""
+
+    sanitized = "".join(
+        character.lower() if character.isalnum() else "_"
+        for character in value
+    ).strip("_")
+    while "__" in sanitized:
+        sanitized = sanitized.replace("__", "_")
+    return sanitized or "unnamed"
 
 
 def _hardware_plot_label(hardware_name: str, hardware_config: dict[str, Any]) -> str:
