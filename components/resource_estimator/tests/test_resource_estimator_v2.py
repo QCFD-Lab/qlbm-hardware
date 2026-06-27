@@ -594,6 +594,53 @@ def test_2d_grid_disabled_qubits_match_declared_topology_size():
     assert validation["warnings"] == []
 
 
+def test_line_coupling_type_generates_linear_chain_topology():
+    estimator = QLBMResourceEstimator(
+        {
+            "num_qubits": 4,
+            "basis_gates": ["rz", "rx", "x", "cz"],
+            "coupling_type": "line",
+            "coupling_params": {"num_qubits": 4},
+        }
+    )
+
+    assert estimator.coupling_map == [
+        [0, 1],
+        [1, 0],
+        [1, 2],
+        [2, 1],
+        [2, 3],
+        [3, 2],
+    ]
+    assert estimator.validate_hardware_config()["topology_matches_num_qubits"] is True
+
+
+def test_extended_line_topology_reports_capacity_violation_but_keeps_metrics():
+    qc = QuantumCircuit(3)
+    qc.cx(0, 1)
+    qc.cx(1, 2)
+
+    estimator = QLBMResourceEstimator(
+        {
+            "num_qubits": 2,
+            "basis_gates": ["cx"],
+            "coupling_type": "line",
+            "coupling_params": {"num_qubits": 3},
+            "gate_times_s": {"cx": 1e-6},
+        }
+    )
+    report = estimator.estimate(qc, optimization_level=1, seed_transpiler=42)
+
+    assert report.get("transpile_error") is None
+    assert report["transpiled"]["num_2q_ops"] == 2
+    assert report["transpiled_compatibility"]["qubit_capacity_ok"] is False
+    assert report["transpiled_compatibility"]["compatible"] is False
+    assert report["transpiled_compatibility"]["used_qubits"] == 3
+    assert report["transpiled_compatibility"]["available_qubits"] == 2
+    assert report["hardware"]["topology_num_qubits"] == 3
+    assert report["hardware"]["validation_warnings"]
+
+
 def test_all_to_all_coupling_type_generates_full_topology():
     estimator = QLBMResourceEstimator(
         {

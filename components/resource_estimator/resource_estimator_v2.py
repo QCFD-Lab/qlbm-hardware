@@ -795,7 +795,7 @@ class QLBMResourceEstimator:
         }
 
     def _generate_coupling_map(self) -> Optional[List[List[int]]]:
-        if self.coupling_type == "linear_chain":
+        if self.coupling_type in {"linear_chain", "line", "linear"}:
             return self._make_linear_chain_edges(
                 int(self.coupling_params.get("num_qubits", 0))
             )

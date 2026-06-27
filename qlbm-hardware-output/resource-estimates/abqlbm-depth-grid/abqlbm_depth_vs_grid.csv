@@ -1,19 +1,19 @@
 algorithm,grid,num_obstacles,num_timesteps,hardware_label,logical_qubits,transpiled_compact_qubits,logical_gate_count,transpiled_gate_count,logical_two_qubit_count,transpiled_two_qubit_count,logical_circuit_depth,transpiled_circuit_depth,max_2q_section,max_2q_section_count,max_time_section,max_time_section_critical_path_s
-ABQLBM,8x8,0,1,Willow (Chip 2),11,12,134,39186,19,7224,72,24028,algorithm_step_1,7092,algorithm_step_1,0.0011060899999999838
-ABQLBM,8x8,0,1,Nighthawk r1,11,12,134,12115,19,3657,72,7406,algorithm_step_1,3546,algorithm_step_1,0.0007792950000000368
-ABQLBM,8x8,0,1,IBM Eagle r3,11,10,134,22717,19,3873,72,12559,algorithm_step_1,4155,algorithm_step_1,0.002776389999999623
-ABQLBM,8x8,0,1,Quantinuum System Model H2,11,10,134,6522,19,1575,72,3553,algorithm_step_1,1572,algorithm_step_1,0.32689000000000473
-ABQLBM,8x8,0,1,Neutral-atom Rydberg processor,11,10,134,4770,19,1623,72,2857,algorithm_step_1,1620,measurement,0.005
-ABQLBM,8x8,0,1,Tunnel Falls,11,10,134,5440,19,1623,72,3080,algorithm_step_1,1620,algorithm_step_1,0.0008590000000000178
-ABQLBM,16x16,0,1,Willow (Chip 2),13,15,169,53256,35,9828,86,32728,algorithm_step_1,9786,algorithm_step_1,0.0015201150000001126
-ABQLBM,16x16,0,1,Nighthawk r1,13,12,169,16151,35,4884,86,9664,algorithm_step_1,4929,algorithm_step_1,0.001062650000000011
-ABQLBM,16x16,0,1,IBM Eagle r3,13,12,169,32471,35,5565,86,16866,algorithm_step_1,5181,algorithm_step_1,0.003547394999999259
-ABQLBM,16x16,0,1,Quantinuum System Model H2,13,12,169,8748,35,2115,86,4733,algorithm_step_1,2112,algorithm_step_1,0.43730999999999776
-ABQLBM,16x16,0,1,Neutral-atom Rydberg processor,13,12,169,6418,35,2187,86,3813,algorithm_step_1,2184,measurement,0.005
-ABQLBM,16x16,0,1,Tunnel Falls,13,12,169,7311,35,2187,86,4108,algorithm_step_1,2184,algorithm_step_1,0.001147000000000004
-ABQLBM,32x32,0,1,Willow (Chip 2),15,15,204,67092,51,12382,102,40433,algorithm_step_1,12448,algorithm_step_1,0.0019171850000002343
-ABQLBM,32x32,0,1,Nighthawk r1,15,14,204,20371,51,6197,102,11762,algorithm_step_1,6197,algorithm_step_1,0.0013511399999998918
-ABQLBM,32x32,0,1,IBM Eagle r3,15,14,204,40696,51,6944,102,20719,algorithm_step_1,6923,algorithm_step_1,0.004624664999999228
-ABQLBM,32x32,0,1,Quantinuum System Model H2,15,14,204,10928,51,2647,102,5913,algorithm_step_1,2644,algorithm_step_1,0.5459699999999809
-ABQLBM,32x32,0,1,Neutral-atom Rydberg processor,15,14,204,8050,51,2747,102,4769,algorithm_step_1,2744,measurement,0.005
-ABQLBM,32x32,0,1,Tunnel Falls,15,14,204,9162,51,2747,102,5136,algorithm_step_1,2744,algorithm_step_1,0.001433799999999974
+ABQLBM,8x8,0,1,SC Willow,11,12,134,39186,19,7224,72,24028,timestep,7092,timestep,0.0006851740000001383
+ABQLBM,8x8,0,1,SC Nighthawk,11,12,134,12115,19,3657,72,7406,timestep,3546,timestep,0.0007792950000000368
+ABQLBM,8x8,0,1,SC Eagle,11,10,134,22717,19,3873,72,12559,timestep,4155,timestep,0.002776389999999623
+ABQLBM,8x8,0,1,Trapped-ion,11,10,134,6522,19,1575,72,3553,timestep,1572,timestep,0.32689000000000473
+ABQLBM,8x8,0,1,Neutral-atom,11,10,134,4770,19,1623,72,2857,timestep,1620,measurement,0.005
+ABQLBM,8x8,0,1,Silicon-spin$^{\dagger}$,11,10,134,13957,19,4284,72,7646,timestep,4278,timestep,0.0005994099999999979
+ABQLBM,16x16,0,1,SC Willow,13,15,169,53256,35,9828,86,32728,timestep,9786,timestep,0.000937209000000203
+ABQLBM,16x16,0,1,SC Nighthawk,13,12,169,16151,35,4884,86,9664,timestep,4929,timestep,0.001062650000000011
+ABQLBM,16x16,0,1,SC Eagle,13,12,169,32471,35,5565,86,16866,timestep,5181,timestep,0.003547394999999259
+ABQLBM,16x16,0,1,Trapped-ion,13,12,169,8748,35,2115,86,4733,timestep,2112,timestep,0.43730999999999776
+ABQLBM,16x16,0,1,Neutral-atom,13,12,169,6418,35,2187,86,3813,timestep,2184,measurement,0.005
+ABQLBM,16x16,0,1,Silicon-spin$^{\dagger}$,13,12,169,19125,35,5883,86,10206,timestep,5877,timestep,0.0008018599999999466
+ABQLBM,32x32,0,1,SC Willow,15,15,204,67092,51,12382,102,40433,timestep,12448,timestep,0.0011805010000002654
+ABQLBM,32x32,0,1,SC Nighthawk,15,14,204,20371,51,6197,102,11762,timestep,6197,timestep,0.0013511399999998918
+ABQLBM,32x32,0,1,SC Eagle,15,14,204,40696,51,6944,102,20719,timestep,6923,timestep,0.004624664999999228
+ABQLBM,32x32,0,1,Trapped-ion,15,14,204,10928,51,2647,102,5913,timestep,2644,timestep,0.5459699999999809
+ABQLBM,32x32,0,1,Neutral-atom,15,14,204,8050,51,2747,102,4769,timestep,2744,measurement,0.005
+ABQLBM,32x32,0,1,Silicon-spin$^{\dagger}$,15,14,204,24625,51,7598,102,12746,timestep,7604,timestep,0.001019199999999919

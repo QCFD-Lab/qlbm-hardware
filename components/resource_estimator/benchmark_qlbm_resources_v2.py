@@ -181,7 +181,6 @@ def build_msqlbm_4x4_v4x4(num_timesteps: int):
         "section_names": section_names,
     }
 
-# TODO: CHECK FOR CORRECTNESS
 def build_spacetime_4x4_d2q4(num_timesteps: int):
     lattice_data = {
         "lattice": {"dim": {"x": 4, "y": 4}, "velocities": "D2Q4"},

@@ -77,15 +77,6 @@ def build_abqlbm_case(grid_x: int, grid_y: int, num_timesteps: int = 1):
     return full_circuit, sectioned_circuit, section_names
 
 
-def build_abqlbm_circuit(grid_x: int, grid_y: int, num_timesteps: int = 1):
-    """Build an ABQLBM logical circuit for a rectangular grid with no obstacles."""
-    return build_abqlbm_case(
-        grid_x,
-        grid_y,
-        num_timesteps,
-    )[0]
-
-
 def section_summary(report: Dict[str, Any]) -> Dict[str, Any]:
     """Return compact section-level metrics from an estimator report."""
     section_analysis = report.get("section_analysis") or {}
@@ -97,27 +88,6 @@ def section_summary(report: Dict[str, Any]) -> Dict[str, Any]:
         "max_time_section": max_time.get("section"),
         "max_time_section_critical_path_s": max_time.get("critical_path_time_s"),
     }
-
-
-def latex_cell(value: Any) -> str:
-    """Return a simple LaTeX table cell."""
-    if value is None:
-        return ""
-    text = str(value)
-    return (
-        text.replace("\\", "\\textbackslash{}")
-        .replace("&", "\\&")
-        .replace("_", "\\_")
-    )
-
-
-def latex_number(value: Any) -> str:
-    """Return a compact LaTeX numeric cell."""
-    if value is None:
-        return ""
-    if isinstance(value, float):
-        return f"{value:.3g}"
-    return str(value)
 
 
 def select_hardware(
@@ -223,11 +193,10 @@ def estimate_depth_rows(
     return rows
 
 
-def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> Tuple[Path, Path]:
-    """Write CSV and LaTeX tables."""
+def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> Path:
+    """Write CSV and raw JSON outputs."""
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / "abqlbm_depth_vs_grid.csv"
-    tex_path = output_dir / "abqlbm_depth_vs_grid.tex"
 
     fieldnames = [
         "algorithm",
@@ -254,62 +223,6 @@ def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> Tuple[Path, P
         for row in rows:
             writer.writerow({key: row.get(key) for key in fieldnames})
 
-    with tex_path.open("w", encoding="utf-8") as file:
-        grids = []
-        platforms = []
-        lookup = {}
-        for row in rows:
-            if row["grid"] not in grids:
-                grids.append(row["grid"])
-            if row["hardware_label"] not in platforms:
-                platforms.append(row["hardware_label"])
-            lookup[(row["hardware_label"], row["grid"])] = row
-
-        metrics = [
-            ("Logical qubits", "logical_qubits"),
-            ("Compact qubits", "transpiled_compact_qubits"),
-            ("Logical gates", "logical_gate_count"),
-            ("Transpiled gates", "transpiled_gate_count"),
-            ("Logical 2q", "logical_two_qubit_count"),
-            ("Transpiled 2q", "transpiled_two_qubit_count"),
-            ("Logical depth", "logical_circuit_depth"),
-            ("Transpiled depth", "transpiled_circuit_depth"),
-            ("Max 2q section", "max_2q_section"),
-            ("Max 2q section count", "max_2q_section_count"),
-            ("Max time section", "max_time_section"),
-            ("Max section time (s)", "max_time_section_critical_path_s"),
-        ]
-
-        file.write("\\begin{table}\n")
-        file.write("\\centering\n")
-        file.write("\\scriptsize\n")
-        file.write("\\begin{tabular}{ll" + ("r" * len(grids)) + "}\n")
-        file.write("\\hline\n")
-        file.write("Platform & Metric & " + " & ".join(latex_cell(grid) for grid in grids) + " \\\\\n")
-        file.write("\\hline\n")
-        for platform in platforms:
-            for metric_label, metric_key in metrics:
-                values = [
-                    lookup.get((platform, grid), {}).get(metric_key)
-                    for grid in grids
-                ]
-                formatted_values = [
-                    latex_cell(value)
-                    if isinstance(value, str)
-                    else latex_number(value)
-                    for value in values
-                ]
-                file.write(
-                    f"{latex_cell(platform)} & {latex_cell(metric_label)} & "
-                    + " & ".join(formatted_values)
-                    + " \\\\\n"
-                )
-            file.write("\\hline\n")
-        file.write("\\end{tabular}\n")
-        file.write("\\caption{ABQLBM no-obstacle resource estimates by grid size.}\n")
-        file.write("\\label{tab:abqlbm-grid-resources}\n")
-        file.write("\\end{table}\n")
-
     reports_dir = output_dir / "reports"
     reports_dir.mkdir(exist_ok=True)
     for row in rows:
@@ -317,7 +230,7 @@ def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> Tuple[Path, P
         with report_path.open("w", encoding="utf-8") as file:
             json.dump(row["report"], file, indent=2)
 
-    return csv_path, tex_path
+    return csv_path
 
 
 def parse_grid(value: str) -> Tuple[int, int]:
@@ -360,9 +273,8 @@ def main() -> None:
         optimization_level=args.optimization_level,
         seed_transpiler=args.seed_transpiler,
     )
-    csv_path, tex_path = write_outputs(rows, args.output_dir)
+    csv_path = write_outputs(rows, args.output_dir)
     print(f"Wrote {len(rows)} rows to {csv_path}")
-    print(f"Wrote LaTeX table to {tex_path}")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
@@ -14,30 +13,27 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
 
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
-
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
-from components.resource_estimator.benchmark_qlbm_resources_v2 import (  # noqa: E402
+from components.resource_estimator import QLBMResourceEstimator
+from components.resource_estimator.benchmark_qlbm_resources_v2 import (
     build_full_logical_circuit,
     build_sectioned_logical_circuit,
     json_safe,
     load_hardware_configs,
 )
-from components.resource_estimator.thesis_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (
     deterministic_obstacles,
 )
-from qlbm import SpaceTimeLattice  # noqa: E402
-from qlbm.components import EmptyPrimitive  # noqa: E402
-from qlbm.components.spacetime import (  # noqa: E402
+from qlbm import SpaceTimeLattice
+from qlbm.components import EmptyPrimitive
+from qlbm.components.spacetime import (
     SpaceTimeGridVelocityMeasurement,
     SpaceTimeQLBM,
 )
-from qlbm.components.spacetime.initial.pointwise import (  # noqa: E402
+from qlbm.components.spacetime.initial.pointwise import (
     PointWiseSpaceTimeInitialConditions,
 )
 
@@ -216,7 +212,7 @@ def estimate_obstacle_rows(
 
 
 def table_fieldnames() -> List[str]:
-    """Return the thesis-facing CSV fields."""
+    """Return the resource-table CSV fields."""
     return [
         "algorithm",
         "grid",
@@ -238,29 +234,8 @@ def table_fieldnames() -> List[str]:
     ]
 
 
-def latex_cell(value: Any) -> str:
-    """Return a simple LaTeX table cell."""
-    if value is None:
-        return ""
-    text = str(value)
-    return (
-        text.replace("\\", "\\textbackslash{}")
-        .replace("&", "\\&")
-        .replace("_", "\\_")
-    )
-
-
-def latex_number(value: Any) -> str:
-    """Return a compact LaTeX numeric cell."""
-    if value is None:
-        return ""
-    if isinstance(value, float):
-        return f"{value:.3g}"
-    return str(value)
-
-
 def write_csv(rows: List[Dict[str, Any]], csv_path: Path) -> None:
-    """Write thesis-facing CSV rows."""
+    """Write resource-table CSV rows."""
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = table_fieldnames()
     with csv_path.open("w", newline="", encoding="utf-8") as file:
@@ -268,74 +243,6 @@ def write_csv(rows: List[Dict[str, Any]], csv_path: Path) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({key: row.get(key) for key in fieldnames})
-
-
-def write_latex(rows: List[Dict[str, Any]], tex_path: Path) -> None:
-    """Write a portrait pivoted LaTeX table."""
-    tex_path.parent.mkdir(parents=True, exist_ok=True)
-    obstacle_counts = []
-    platforms = []
-    lookup = {}
-    for row in rows:
-        label = str(row["num_obstacles"])
-        if label not in obstacle_counts:
-            obstacle_counts.append(label)
-        if row["hardware_label"] not in platforms:
-            platforms.append(row["hardware_label"])
-        lookup[(row["hardware_label"], label)] = row
-
-    metrics = [
-        ("Logical qubits", "logical_qubits"),
-        ("Compact qubits", "transpiled_compact_qubits"),
-        ("Logical gates", "logical_gate_count"),
-        ("Transpiled gates", "transpiled_gate_count"),
-        ("Logical 2q", "logical_two_qubit_count"),
-        ("Transpiled 2q", "transpiled_two_qubit_count"),
-        ("Logical depth", "logical_circuit_depth"),
-        ("Transpiled depth", "transpiled_circuit_depth"),
-        ("Max 2q section", "max_2q_section"),
-        ("Max 2q section count", "max_2q_section_count"),
-        ("Max time section", "max_time_section"),
-        ("Max section time (s)", "max_time_section_critical_path_s"),
-    ]
-
-    with tex_path.open("w", encoding="utf-8") as file:
-        file.write("\\begin{table}\n")
-        file.write("\\centering\n")
-        file.write("\\scriptsize\n")
-        file.write("\\begin{tabular}{ll" + ("r" * len(obstacle_counts)) + "}\n")
-        file.write("\\hline\n")
-        file.write(
-            "Platform & Metric & "
-            + " & ".join(latex_cell(f"{count} obs") for count in obstacle_counts)
-            + " \\\\\n"
-        )
-        file.write("\\hline\n")
-        for platform in platforms:
-            for metric_label, metric_key in metrics:
-                values = [
-                    lookup.get((platform, count), {}).get(metric_key)
-                    for count in obstacle_counts
-                ]
-                formatted_values = [
-                    latex_cell(value)
-                    if isinstance(value, str)
-                    else latex_number(value)
-                    for value in values
-                ]
-                file.write(
-                    f"{latex_cell(platform)} & {latex_cell(metric_label)} & "
-                    + " & ".join(formatted_values)
-                    + " \\\\\n"
-                )
-            file.write("\\hline\n")
-        file.write("\\end{tabular}\n")
-        file.write(
-            "\\caption{SpaceTimeQLBM resource estimates for a fixed grid with "
-            "varying bounceback obstacle count.}\n"
-        )
-        file.write("\\label{tab:spacetimeqlbm-obstacle-resources}\n")
-        file.write("\\end{table}\n")
 
 
 def write_reports(rows: List[Dict[str, Any]], reports_dir: Path) -> None:
@@ -354,13 +261,11 @@ def write_reports(rows: List[Dict[str, Any]], reports_dir: Path) -> None:
 
 
 def write_outputs(rows: List[Dict[str, Any]], output_dir: Path):
-    """Write CSV, LaTeX, and raw JSON outputs."""
+    """Write CSV and raw JSON outputs."""
     csv_path = output_dir / "spacetimeqlbm_obstacle_resources.csv"
-    tex_path = output_dir / "spacetimeqlbm_obstacle_resources.tex"
     write_csv(rows, csv_path)
-    write_latex(rows, tex_path)
     write_reports(rows, output_dir / "reports")
-    return csv_path, tex_path
+    return csv_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -399,9 +304,8 @@ def main() -> None:
         optimization_level=args.optimization_level,
         seed_transpiler=args.seed_transpiler,
     )
-    csv_path, tex_path = write_outputs(rows, args.output_dir)
+    csv_path = write_outputs(rows, args.output_dir)
     print(f"Wrote {len(rows)} rows to {csv_path}")
-    print(f"Wrote LaTeX table to {tex_path}")
 
 
 if __name__ == "__main__":

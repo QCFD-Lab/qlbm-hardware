@@ -1,4 +1,4 @@
-"""Generate thesis figures and tables from resource-estimation CSV results."""
+"""Generate figures and CSV tables from resource-estimation CSV results."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
 DEFAULT_OUTPUT_DIR = (
     QLBM_HARDWARE_ROOT / "qlbm-hardware-output" / "resource-estimates" / "v2"
 )
-DEFAULT_CSV_PATH = DEFAULT_OUTPUT_DIR / "thesis_resource_estimates.csv"
+DEFAULT_CSV_PATH = DEFAULT_OUTPUT_DIR / "experiment_resource_estimates.csv"
 
 
 def clean_results(df: pd.DataFrame) -> pd.DataFrame:
@@ -77,7 +77,7 @@ def save_line_plot(
     ylabel: str,
     figures_dir: Path,
 ) -> List[Path]:
-    """Save a faceted line plot by algorithm."""
+    """Save a line plot by algorithm."""
     data = successful_rows(df[df["experiment"].eq(experiment)], y)
     if data.empty:
         return []
@@ -176,17 +176,15 @@ def save_figure(figure: plt.Figure, figures_dir: Path, filename: str) -> List[Pa
 
 
 def write_table(table: pd.DataFrame, tables_dir: Path, name: str) -> List[Path]:
-    """Write a table as CSV and LaTeX."""
+    """Write a table as CSV."""
     tables_dir.mkdir(parents=True, exist_ok=True)
     csv_path = tables_dir / f"{name}.csv"
-    tex_path = tables_dir / f"{name}.tex"
     table.to_csv(csv_path, index=False)
-    table.to_latex(tex_path, index=False)
-    return [csv_path, tex_path]
+    return [csv_path]
 
 
 def save_tables(df: pd.DataFrame, tables_dir: Path) -> List[Path]:
-    """Save compact thesis summary tables."""
+    """Save compact resource summary tables."""
     outputs: List[Path] = []
 
     compatible = df[
@@ -273,7 +271,7 @@ def generate_outputs(
     csv_path: Path = DEFAULT_CSV_PATH,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
 ) -> List[Path]:
-    """Generate all thesis figures and tables from a resource CSV."""
+    """Generate all figures and CSV tables from a resource CSV."""
     df = clean_results(pd.read_csv(csv_path))
     figures_dir = output_dir / "figures"
     tables_dir = output_dir / "tables"
@@ -336,7 +334,7 @@ def generate_outputs(
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Plot thesis QLBM resource-estimation results.",
+        description="Plot QLBM resource-estimation results.",
     )
     parser.add_argument("--csv-path", type=Path, default=DEFAULT_CSV_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

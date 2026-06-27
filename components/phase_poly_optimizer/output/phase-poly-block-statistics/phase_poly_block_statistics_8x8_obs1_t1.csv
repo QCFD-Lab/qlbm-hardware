@@ -1,4 +1,4 @@
 algorithm,grid,num_obstacles,num_timesteps,basis_gates,coupling_type,coupling_params,hardware_qubits,logical_qubits,transpiled_qubits,transpiled_active_qubits,transpiled_depth,transpiled_size,num_detected_blocks,average_block_size,average_active_qubits,circuit_coverage_percent,transpiled_total_rz,transpiled_total_cx,block_total_rz,block_total_cx,largest_block_size,largest_block_active_qubits,largest_block_rz,largest_block_cx,transpile_error
-ABQLBM,8x8,1,1,rz sx x cx,all_to_all,{'num_qubits': 50},50,13,50,13,19072,32424,4097,6.864046863558701,2.386136197217476,86.7320503330866,18591,9531,18591,9531,52,5,29,23,
-MSQLBM,8x8,1,1,rz sx x cx,all_to_all,{'num_qubits': 50},50,15,50,15,37808,74111,10902,5.75032104201064,2.3007705008255366,84.58933221788938,41770,20920,41770,20920,49,8,24,25,
-SpaceTimeQLBM,8x8,1,1,rz sx x cx,all_to_all,{'num_qubits': 50},50,26,50,26,3360,5327,1026,4.137426900584796,2.179337231968811,79.68837995119205,2985,1260,2985,1260,14,3,8,6,
+ABQLBM,8x8,1,1,rz sx x cx,all_to_all,{'num_qubits': 49},49,13,49,13,19072,32424,4097,6.864046863558701,2.386136197217476,86.7320503330866,18591,9531,18591,9531,52,5,29,23,
+MSQLBM,8x8,1,1,rz sx x cx,all_to_all,{'num_qubits': 49},49,15,49,15,37808,74111,10902,5.75032104201064,2.3007705008255366,84.58933221788938,41770,20920,41770,20920,49,8,24,25,
+SpaceTimeQLBM,8x8,1,1,rz sx x cx,all_to_all,{'num_qubits': 49},49,26,49,26,3360,5327,1026,4.137426900584796,2.179337231968811,79.68837995119205,2985,1260,2985,1260,14,3,8,6,

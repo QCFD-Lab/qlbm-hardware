@@ -1,3 +1,0 @@
-timestep,field_total_variation_distance,field_relative_l2_error,field_rmse,rho_x_sum_total_variation_distance,rho_x_mean_relative_l2_error
-0,0.25,0.48507125007266594,0.04419417382415922,0.25,0.48507125007266594
-1,0.6875,1.2041594578792296,0.08414320011147662,0.5625,1.114172029062311
