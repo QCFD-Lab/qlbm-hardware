@@ -9,6 +9,7 @@ from components.noise_analysis.tools.count_decoding import (
 )
 from components.noise_analysis.tools.density_analysis import counts_to_density_field
 from components.noise_analysis.tools.velocity_analysis import (
+    compare_velocity_fields,
     counts_to_velocity_fields,
     velocity_profiles,
 )
@@ -32,7 +33,6 @@ def ab_lattice() -> ABLattice:
 
 def _qiskit_count_key(
     lattice: ABLattice,
-    *,
     x: int,
     y: int,
     velocity: int | None = None,
@@ -150,6 +150,27 @@ def test_velocity_profiles_include_density_weighted_cross_sections() -> None:
 
     assert profiles["ux_x_mean"][0] == pytest.approx(0.55)
     assert profiles["ux_x_density_weighted"][0] == pytest.approx(0.10 / 0.91)
+
+
+def test_velocity_profile_comparison_masks_low_density_leakage(
+    ab_lattice: ABLattice,
+) -> None:
+    supported_key = _qiskit_count_key(ab_lattice, x=1, y=0, velocity=1)
+    leaked_key = _qiskit_count_key(ab_lattice, x=3, y=0, velocity=5)
+
+    comparison = compare_velocity_fields(
+        {supported_key: 4096},
+        {supported_key: 4096, leaked_key: 1},
+        ab_lattice,
+    )
+
+    masks = comparison["profile_support_masks"]
+    metrics = comparison["metrics"]
+
+    assert masks["x"][1]
+    assert not masks["x"][3]
+    assert metrics["x_profile_supported_bins"] == 1
+    assert metrics["ux_x_density_weighted_relative_l2_error"] == pytest.approx(0.0)
 
 
 def test_density_decoding_ignores_extra_high_classical_bits(
