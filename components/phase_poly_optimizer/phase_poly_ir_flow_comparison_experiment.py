@@ -6,7 +6,6 @@ import argparse
 import contextlib
 import csv
 import io
-import json
 import os
 import sys
 from pathlib import Path
@@ -31,9 +30,9 @@ from components.phase_poly_optimizer.optimizer_benchmark_simulation import (  # 
     run_all_to_all_intermediate_native_phase_poly_pipeline,
     run_intermediate_native_phase_poly_pipeline,
 )
-from components.resource_estimator.thesis_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (  # noqa: E402
     DEFAULT_ALGORITHMS,
-    build_thesis_case,
+    build_experiment_case,
     make_case_spec,
 )
 
@@ -240,7 +239,7 @@ def run_ir_flow_comparison(
                 obstacle_boundary="bounceback",
             )
             with contextlib.redirect_stdout(io.StringIO()):
-                built_case = build_thesis_case(spec)
+                built_case = build_experiment_case(spec)
 
             pipeline_report = None
             optimization_error = None
@@ -305,92 +304,8 @@ def write_csv(rows: List[Dict[str, Any]], path: Path) -> None:
         writer.writerows(rows)
 
 
-def latex_escape(value: Any) -> str:
-    """Escape a small value for a LaTeX table cell."""
-    text = "" if value is None else str(value)
-    return (
-        text.replace("\\", r"\textbackslash{}")
-        .replace("&", r"\&")
-        .replace("%", r"\%")
-        .replace("_", r"\_")
-        .replace("#", r"\#")
-    )
-
-
-def latex_number(value: Any) -> str:
-    """Format numeric values for compact LaTeX tables."""
-    if value is None or value == "":
-        return ""
-    if isinstance(value, float):
-        return f"{value:.2f}"
-    return str(value)
-
-
-def _caption(rows: List[Dict[str, Any]]) -> str:
-    first = rows[0]
-    optimizer = str(first["optimizer"]).replace("_", "-")
-    return (
-        "Comparison of direct hardware transpilation against the full "
-        f"intermediate-representation phase-polynomial workflow for {first['device_name']} "
-        f"using the {optimizer} optimizer. The direct hardware circuit is compiled "
-        f"to the native basis {first['native_basis_gates']}; the optimized workflow "
-        f"uses the intermediate basis {first['intermediate_basis_gates']} before "
-        "recompilation to the same hardware target. The circuits use an "
-        f"{first['qlbm_grid']} lattice with {first['num_obstacles']} bounceback "
-        f"obstacle and {first['num_timesteps']} timestep."
-    )
-
-
-def write_latex_table(rows: List[Dict[str, Any]], path: Path) -> None:
-    """Write one hardware/optimizer table with metrics as rows."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    metric_rows = [
-        ("direct_hardware_depth", "Direct HW depth"),
-        ("ir_optimized_hardware_depth", "IR-opt HW depth"),
-        ("direct_hardware_two_qubit", "Direct HW 2Q"),
-        ("ir_optimized_hardware_two_qubit", "IR-opt HW 2Q"),
-        ("hardware_two_qubit_reduction_percent", "HW 2Q red. (\\%)"),
-        ("direct_hardware_rz", "Direct HW RZ"),
-        ("ir_optimized_hardware_rz", "IR-opt HW RZ"),
-        ("direct_hardware_total_gates", "Direct HW gates"),
-        ("ir_optimized_hardware_total_gates", "IR-opt HW gates"),
-    ]
-    algorithms = [str(row["algorithm"]) for row in rows]
-    alignment = "l" + ("r" * len(rows))
-    label = _run_label(rows[0])
-    label_case = (
-        f"{rows[0]['qlbm_grid']}-obs{rows[0]['num_obstacles']}"
-        f"-t{rows[0]['num_timesteps']}"
-    )
-
-    with path.open("w", encoding="utf-8") as file:
-        file.write("\\begin{table}[ht]\n")
-        file.write("\\centering\n")
-        file.write(f"\\begin{{tabular}}{{{alignment}}}\n")
-        file.write("\\hline\n")
-        file.write(
-            "Metric & "
-            + " & ".join(latex_escape(algorithm) for algorithm in algorithms)
-            + " \\\\\n"
-        )
-        file.write("\\hline\n")
-        for key, title in metric_rows:
-            cells = [title]
-            for row in rows:
-                cells.append(latex_escape(latex_number(row.get(key))))
-            file.write(" & ".join(cells) + " \\\\\n")
-        file.write("\\hline\n")
-        file.write("\\end{tabular}\n")
-        file.write(f"\\caption{{{latex_escape(_caption(rows))}}}\n")
-        file.write(
-            "\\label{tab:phase-poly-ir-flow-comparison-"
-            f"{label_case}-{label}}}\n"
-        )
-        file.write("\\end{table}\n")
-
-
 def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> List[Path]:
-    """Write CSV and one LaTeX table per hardware/optimizer run."""
+    """Write CSV output."""
     output_dir.mkdir(parents=True, exist_ok=True)
     first = rows[0]
     stem = (
@@ -399,21 +314,6 @@ def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> List[Path]:
     )
     paths = [output_dir / f"{stem}.csv"]
     write_csv(rows, paths[0])
-
-    seen = []
-    for row in rows:
-        key = (row["hardware_key"], row["optimizer"], row["pipeline"])
-        if key in seen:
-            continue
-        seen.append(key)
-        table_rows = [
-            item
-            for item in rows
-            if (item["hardware_key"], item["optimizer"], item["pipeline"]) == key
-        ]
-        tex_path = output_dir / f"{stem}_{_run_label(table_rows[0])}.tex"
-        write_latex_table(table_rows, tex_path)
-        paths.append(tex_path)
     return paths
 
 

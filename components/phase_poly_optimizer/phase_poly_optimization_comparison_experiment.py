@@ -30,9 +30,9 @@ from components.phase_poly_optimizer import (  # noqa: E402
     ArchitectureAwarePhasePolyOptimizer,
 )
 from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
-from components.resource_estimator.thesis_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (  # noqa: E402
     DEFAULT_ALGORITHMS,
-    build_thesis_case,
+    build_experiment_case,
     make_case_spec,
 )
 
@@ -250,7 +250,7 @@ def run_topology_comparison(
             obstacle_boundary="bounceback",
         )
         with contextlib.redirect_stdout(io.StringIO()):
-            built_case = build_thesis_case(spec)
+            built_case = build_experiment_case(spec)
 
         baseline_report = estimator.estimate(
             built_case.circuit,
@@ -351,105 +351,8 @@ def write_csv(rows: List[Dict[str, Any]], path: Path) -> None:
         writer.writerows(rows)
 
 
-def latex_escape(value: Any) -> str:
-    """Escape a small value for a LaTeX table cell."""
-    text = "" if value is None else str(value)
-    return (
-        text.replace("\\", r"\textbackslash{}")
-        .replace("&", r"\&")
-        .replace("%", r"\%")
-        .replace("_", r"\_")
-        .replace("#", r"\#")
-    )
-
-
-def latex_number(value: Any) -> str:
-    """Format numeric values for a compact LaTeX table."""
-    if value is None or value == "":
-        return ""
-    if isinstance(value, float):
-        return f"{value:.2f}"
-    return str(value)
-
-
-def topology_caption(topology_rows: List[Dict[str, Any]]) -> str:
-    """Build a caption for one topology table."""
-    first = topology_rows[0]
-    obstacle_label = (
-        "obstacle" if int(first["num_obstacles"]) == 1 else "obstacles"
-    )
-    timestep_label = (
-        "timestep" if int(first["num_timesteps"]) == 1 else "timesteps"
-    )
-    if first["topology"] == "all_to_all":
-        topology_label = "all-to-all"
-    else:
-        params = json.loads(first["coupling_params"])
-        topology_label = (
-            f"{params['rows']}x{params['cols']} 2D nearest-neighbour"
-        )
-    optimizer_label = str(first["optimizer"]).replace("_", "-")
-    return (
-        "Unoptimized and phase-polynomial-optimized resource metrics after "
-        f"transpilation to a hypothetical {first['hardware_qubits']}-qubit "
-        f"{topology_label} CX/RZ basis using the {optimizer_label} optimizer "
-        f"for {first['qlbm_grid']} QLBM circuits with {first['num_obstacles']} "
-        f"bounceback {obstacle_label} and {first['num_timesteps']} "
-        f"{timestep_label}."
-    )
-
-
-def write_latex_table(rows: List[Dict[str, Any]], path: Path) -> None:
-    """Write one topology's comparison rows to a transposed LaTeX table."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    metric_rows = [
-        ("baseline_depth", "Depth base"),
-        ("optimized_depth", "Depth opt."),
-        ("baseline_cx", "CX base"),
-        ("optimized_cx", "CX opt."),
-        ("cx_reduction_percent", "CX red. (\\%)"),
-        ("baseline_rz", "RZ base"),
-        ("optimized_rz", "RZ opt."),
-        ("baseline_total_gates", "Gates base"),
-        ("optimized_total_gates", "Gates opt."),
-    ]
-    algorithms = [str(row["algorithm"]) for row in rows]
-    alignment = "l" + ("r" * len(rows))
-    label_topology = str(rows[0]["topology"]).replace("_", "-")
-    label_case = (
-        f"{rows[0]['qlbm_grid'].replace('x', 'x')}"
-        f"-obs{rows[0]['num_obstacles']}"
-        f"-t{rows[0]['num_timesteps']}"
-    )
-
-    with path.open("w", encoding="utf-8") as file:
-        file.write("\\begin{table}[ht]\n")
-        file.write("\\centering\n")
-        file.write(f"\\begin{{tabular}}{{{alignment}}}\n")
-        file.write("\\hline\n")
-        file.write(
-            "Metric & "
-            + " & ".join(latex_escape(algorithm) for algorithm in algorithms)
-            + " \\\\\n"
-        )
-        file.write("\\hline\n")
-        for key, label in metric_rows:
-            cells = [label]
-            for row in rows:
-                cells.append(latex_escape(latex_number(row.get(key))))
-            file.write(" & ".join(cells) + " \\\\\n")
-        file.write("\\hline\n")
-        file.write("\\end{tabular}\n")
-        file.write(f"\\caption{{{latex_escape(topology_caption(rows))}}}\n")
-        file.write(
-            "\\label{tab:phase-poly-optimization-comparison-"
-            f"{label_case}-{label_topology}}}\n"
-        )
-        file.write("\\end{table}\n")
-
-
 def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> List[Path]:
-    """Write CSV and one LaTeX table per topology."""
+    """Write CSV output."""
     output_dir.mkdir(parents=True, exist_ok=True)
     first = rows[0]
     grid = str(first["qlbm_grid"]).replace("x", "x")
@@ -459,17 +362,6 @@ def write_outputs(rows: List[Dict[str, Any]], output_dir: Path) -> List[Path]:
     )
     paths = [output_dir / f"{stem}.csv"]
     write_csv(rows, paths[0])
-
-    for topology in ("all_to_all", "2d_grid"):
-        topology_rows = [row for row in rows if row["topology"] == topology]
-        if not topology_rows:
-            continue
-        tex_path = (
-            output_dir
-            / f"{stem}_{topology}.tex"
-        )
-        write_latex_table(topology_rows, tex_path)
-        paths.append(tex_path)
     return paths
 
 

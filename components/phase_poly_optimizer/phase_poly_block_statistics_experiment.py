@@ -1,4 +1,4 @@
-"""Generate phase-polynomial block statistics for thesis result tables."""
+"""Generate phase-polynomial block statistics as CSV results."""
 
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
         sys.path.insert(0, str(path))
 
 from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
-from components.resource_estimator.thesis_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (  # noqa: E402
     DEFAULT_ALGORITHMS,
-    build_thesis_case,
+    build_experiment_case,
     make_case_spec,
 )
 
@@ -43,9 +43,9 @@ COUPLING_CHOICES = ["all_to_all", "nearest_neighbor", "2d_grid", "linear_chain"]
 DEFAULT_GRID_SIZE = 8
 DEFAULT_NUM_OBSTACLES = 1
 DEFAULT_NUM_TIMESTEPS = 1
-DEFAULT_NUM_QUBITS = 50
-DEFAULT_HARDWARE_GRID_ROWS = 5
-DEFAULT_HARDWARE_GRID_COLS = 10
+DEFAULT_NUM_QUBITS = 49
+DEFAULT_HARDWARE_GRID_ROWS = 7
+DEFAULT_HARDWARE_GRID_COLS = 7
 DEFAULT_OPTIMIZATION_LEVEL = 0
 DEFAULT_SEED_TRANSPILER = 42
 
@@ -150,7 +150,7 @@ def make_phase_block_row(
     num_timesteps: int,
     hardware_config: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Flatten phase-polynomial block analysis into a CSV/LaTeX row."""
+    """Flatten phase-polynomial block analysis into a CSV row."""
     transpiled = report.get("transpiled") or {}
     logical = report.get("logical") or {}
     op_counts = transpiled.get("op_counts") or {}
@@ -223,7 +223,7 @@ def run_phase_block_statistics(
             obstacle_boundary="bounceback",
         )
         with contextlib.redirect_stdout(io.StringIO()):
-            built_case = build_thesis_case(spec)
+            built_case = build_experiment_case(spec)
         report = estimator.estimate(
             built_case.circuit,
             label=spec.label,
@@ -251,97 +251,21 @@ def write_csv(rows: List[Dict[str, Any]], path: Path) -> None:
     """Write block statistics rows to CSV."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+        writer = csv.DictWriter(file, fieldnames=FIELDNAMES, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
-
-
-def latex_escape(value: Any) -> str:
-    """Escape a small value for a LaTeX table cell."""
-    text = "" if value is None else str(value)
-    return (
-        text.replace("\\", r"\textbackslash{}")
-        .replace("&", r"\&")
-        .replace("%", r"\%")
-        .replace("_", r"\_")
-        .replace("#", r"\#")
-    )
-
-
-def latex_number(value: Any) -> str:
-    """Format numeric values for a compact LaTeX table."""
-    if value is None or value == "":
-        return ""
-    if isinstance(value, float):
-        return f"{value:.2f}"
-    return str(value)
-
-
-def write_latex(rows: List[Dict[str, Any]], path: Path) -> None:
-    """Write a thesis-ready transposed LaTeX tabular summary."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    coupling_label = str(rows[0]["coupling_type"]).replace("_", "-")
-    coupling_text = str(rows[0]["coupling_type"]).replace("_", " ")
-    coupling_params = rows[0].get("coupling_params") or {}
-    if rows[0]["coupling_type"] == "2d_grid" and coupling_params:
-        coupling_text = (
-            f"{coupling_params.get('rows')}x{coupling_params.get('cols')} "
-            "2D nearest-neighbour"
-        )
-    metric_rows = [
-        ("num_detected_blocks", "Blocks"),
-        ("average_block_size", "Avg. block size"),
-        ("average_active_qubits", "Avg. active qubits"),
-        ("circuit_coverage_percent", "Coverage (\\%)"),
-        ("transpiled_total_rz", "Total RZ"),
-        ("transpiled_total_cx", "Total CX"),
-        ("largest_block_rz", "Largest RZ"),
-        ("largest_block_cx", "Largest CX"),
-    ]
-    algorithms = [str(row["algorithm"]) for row in rows]
-    alignment = "l" + ("r" * len(rows))
-
-    with path.open("w", encoding="utf-8") as file:
-        file.write("\\begin{table}[ht]\n")
-        file.write("\\centering\n")
-        file.write(f"\\begin{{tabular}}{{{alignment}}}\n")
-        file.write("\\hline\n")
-        file.write(
-            "Metric & "
-            + " & ".join(latex_escape(algorithm) for algorithm in algorithms)
-            + " \\\\\n"
-        )
-        file.write("\\hline\n")
-        for key, label in metric_rows:
-            cells = [label]
-            for row in rows:
-                cells.append(latex_number(row.get(key)))
-            file.write(" & ".join(cells) + " \\\\\n")
-        file.write("\\hline\n")
-        file.write("\\end{tabular}\n")
-        file.write(
-            "\\caption{Phase-polynomial block statistics after transpilation "
-            "to a hypothetical 50-qubit "
-            f"{latex_escape(coupling_text)} "
-            "CX/RZ basis for 8x8 QLBM circuits with one bounceback obstacle "
-            "and one timestep.}\n"
-        )
-        file.write(f"\\label{{tab:phase-poly-block-statistics-{coupling_label}}}\n")
-        file.write("\\end{table}\n")
 
 
 def write_outputs(
     rows: List[Dict[str, Any]],
     output_dir: Path,
     coupling: str = DEFAULT_COUPLING,
-) -> tuple[Path, Path]:
-    """Write CSV and LaTeX outputs."""
+) -> Path:
+    """Write CSV output."""
     suffix = "" if coupling == "all_to_all" else f"_{coupling}"
     csv_path = output_dir / f"phase_poly_block_statistics_8x8_obs1_t1{suffix}.csv"
-    tex_path = output_dir / f"phase_poly_block_statistics_8x8_obs1_t1{suffix}.tex"
     write_csv(rows, csv_path)
-    write_latex(rows, tex_path)
-    return csv_path, tex_path
+    return csv_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -402,9 +326,8 @@ def main() -> None:
         optimization_level=args.optimization_level,
         seed_transpiler=args.seed_transpiler,
     )
-    csv_path, tex_path = write_outputs(rows, args.output_dir, coupling=args.coupling)
+    csv_path = write_outputs(rows, args.output_dir, coupling=args.coupling)
     print(f"Wrote {len(rows)} rows to {csv_path}")
-    print(f"Wrote LaTeX table to {tex_path}")
 
 
 if __name__ == "__main__":
