@@ -9,6 +9,10 @@ import numpy as np
 from qlbm.lattice.spacetime.properties_base import LatticeDiscretizationProperties
 from .count_decoding import decode_grid_velocity_count, grid_shape
 
+VELOCITY_PROFILE_DENSITY_FLOOR = 1e-3
+VELOCITY_COMPONENTS = ("ux", "uy")
+PROFILE_AXES = ("x", "y")
+
 
 def velocity_vectors_and_masses(lattice) -> tuple[np.ndarray, np.ndarray]:
     """Return the velocity vectors and channel masses for the lattice discretization."""
@@ -94,7 +98,108 @@ def counts_to_velocity_fields(
 
 
 def _safe_divide(numerator: np.ndarray, denominator: np.ndarray) -> np.ndarray:
-    return np.divide(numerator, denominator, out=np.zeros_like(numerator, dtype=float), where=denominator > 0)
+    return np.divide(
+        numerator,
+        denominator,
+        out=np.zeros_like(numerator, dtype=float),
+        where=denominator > 0,
+    )
+
+def _profile_support_masks(
+    baseline_fields: dict[str, np.ndarray],
+    noisy_fields: dict[str, np.ndarray],
+    density_floor: float,
+) -> dict[str, np.ndarray]:
+    """Return profile bins with enough density support for stable velocities."""
+
+    baseline_rho_xy = baseline_fields["rho_xy"]
+    noisy_rho_xy = noisy_fields["rho_xy"]
+    baseline_rho_x = baseline_rho_xy.sum(axis=1)
+    noisy_rho_x = noisy_rho_xy.sum(axis=1)
+    baseline_rho_y = baseline_rho_xy.sum(axis=0)
+    noisy_rho_y = noisy_rho_xy.sum(axis=0)
+
+    return {
+        "x": np.maximum(baseline_rho_x, noisy_rho_x) >= density_floor,
+        "y": np.maximum(baseline_rho_y, noisy_rho_y) >= density_floor,
+        "baseline_x": baseline_rho_x >= density_floor,
+        "noisy_x": noisy_rho_x >= density_floor,
+        "baseline_y": baseline_rho_y >= density_floor,
+        "noisy_y": noisy_rho_y >= density_floor,
+        "baseline_rho_x": baseline_rho_x,
+        "noisy_rho_x": noisy_rho_x,
+        "baseline_rho_y": baseline_rho_y,
+        "noisy_rho_y": noisy_rho_y,
+    }
+
+
+def _profile_axis(profile_name: str) -> str:
+    if "_x_" in profile_name or profile_name.endswith("_x"):
+        return "x"
+    if "_y_" in profile_name or profile_name.endswith("_y"):
+        return "y"
+    raise ValueError(f"Cannot infer profile axis from {profile_name!r}.")
+
+def _zero_low_density_profile(values: np.ndarray, density_mask: np.ndarray) -> np.ndarray:
+    filtered = values.astype(float, copy=True)
+    filtered[~density_mask] = 0.0
+    return filtered
+
+def _profile_density_mask(
+    support_masks: dict[str, np.ndarray],
+    profile_name: str,
+    label: str,
+) -> np.ndarray:
+    return support_masks[f"{label}_{_profile_axis(profile_name)}"]
+
+def _profile_key(component: str, axis: str, suffix: str) -> str:
+    return f"{component}_{axis}_{suffix}"
+
+def _masked_profile(
+    profiles: dict[str, np.ndarray],
+    support_masks: dict[str, np.ndarray],
+    label: str,
+    profile_name: str,
+) -> np.ndarray:
+    return _zero_low_density_profile(
+        profiles[profile_name],
+        _profile_density_mask(support_masks, profile_name, label),
+    )
+
+def _velocity_profile_error_metrics(
+    baseline_profiles: dict[str, np.ndarray],
+    noisy_profiles: dict[str, np.ndarray],
+    support_masks: dict[str, np.ndarray],
+) -> dict[str, float]:
+    metrics = {}
+    for profile_name in baseline_profiles:
+        baseline_profile = _masked_profile(
+            baseline_profiles,
+            support_masks,
+            "baseline",
+            profile_name,
+        )
+        noisy_profile = _masked_profile(
+            noisy_profiles,
+            support_masks,
+            "noisy",
+            profile_name,
+        )
+        difference = noisy_profile - baseline_profile
+        baseline_norm = float(np.linalg.norm(baseline_profile, ord=2))
+        difference_norm = float(np.linalg.norm(difference, ord=2))
+        metrics[f"{profile_name}_l2_error"] = difference_norm
+        metrics[f"{profile_name}_relative_l2_error"] = (
+            difference_norm / baseline_norm if baseline_norm > 0 else 0.0
+        )
+        metrics[f"{profile_name}_linf_error"] = (
+            float(np.max(np.abs(difference))) if difference.size else 0.0
+        )
+    return metrics
+
+
+def _fraction(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator > 0 else 0.0
 
 
 def velocity_profiles(fields: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
@@ -130,6 +235,7 @@ def compare_velocity_fields(
     baseline_counts: Mapping[str, int | float],
     noisy_counts: Mapping[str, int | float],
     lattice,
+    density_floor: float = VELOCITY_PROFILE_DENSITY_FLOOR,
 ) -> dict[str, Any]:
     """Compare velocity fields and profiles against a noiseless baseline."""
 
@@ -137,23 +243,20 @@ def compare_velocity_fields(
     noisy_fields = counts_to_velocity_fields(noisy_counts, lattice)
     baseline_profiles = velocity_profiles(baseline_fields)
     noisy_profiles = velocity_profiles(noisy_fields)
+    support_masks = _profile_support_masks(
+        baseline_fields,
+        noisy_fields,
+        density_floor=density_floor,
+    )
 
     ux_diff = noisy_fields["ux_xy"] - baseline_fields["ux_xy"]
     uy_diff = noisy_fields["uy_xy"] - baseline_fields["uy_xy"]
     rho_diff = noisy_fields["rho_xy"] - baseline_fields["rho_xy"]
-    profile_metrics = {}
-    for profile_name, baseline_profile in baseline_profiles.items():
-        noisy_profile = noisy_profiles[profile_name]
-        difference = noisy_profile - baseline_profile
-        baseline_norm = float(np.linalg.norm(baseline_profile, ord=2))
-        difference_norm = float(np.linalg.norm(difference, ord=2))
-        profile_metrics[f"{profile_name}_l2_error"] = difference_norm
-        profile_metrics[f"{profile_name}_relative_l2_error"] = (
-            difference_norm / baseline_norm if baseline_norm > 0 else 0.0
-        )
-        profile_metrics[f"{profile_name}_linf_error"] = float(
-            np.max(np.abs(difference))
-        )
+    profile_metrics = _velocity_profile_error_metrics(
+        baseline_profiles,
+        noisy_profiles,
+        support_masks,
+    )
 
     baseline_total_raw_mass = float(baseline_fields["total_raw_mass"])
     noisy_total_raw_mass = float(noisy_fields["total_raw_mass"])
@@ -161,12 +264,17 @@ def compare_velocity_fields(
         baseline_fields["invalid_velocity_raw_mass"]
     )
     noisy_invalid_velocity_raw_mass = float(noisy_fields["invalid_velocity_raw_mass"])
+    baseline_invalid_fraction = baseline_invalid_velocity_raw_mass / baseline_total_raw_mass \
+        if baseline_total_raw_mass > 0 else 0.0
+    noisy_invalid_fraction = noisy_invalid_velocity_raw_mass / noisy_total_raw_mass \
+        if noisy_total_raw_mass > 0 else 0.0
 
     return {
         "baseline_fields": baseline_fields,
         "noisy_fields": noisy_fields,
         "baseline_profiles": baseline_profiles,
         "noisy_profiles": noisy_profiles,
+        "profile_support_masks": support_masks,
         "metrics": {
             "baseline_raw_mass": float(sum(baseline_counts.values())),
             "noisy_raw_mass": float(sum(noisy_counts.values())),
@@ -178,26 +286,14 @@ def compare_velocity_fields(
             ),
             "baseline_invalid_velocity_raw_mass": baseline_invalid_velocity_raw_mass,
             "noisy_invalid_velocity_raw_mass": noisy_invalid_velocity_raw_mass,
-            "baseline_invalid_velocity_fraction": (
-                baseline_invalid_velocity_raw_mass / baseline_total_raw_mass
-                if baseline_total_raw_mass > 0
-                else 0.0
-            ),
-            "noisy_invalid_velocity_fraction": (
-                noisy_invalid_velocity_raw_mass / noisy_total_raw_mass
-                if noisy_total_raw_mass > 0
-                else 0.0
-            ),
+            "baseline_invalid_velocity_fraction": baseline_invalid_fraction,
+            "noisy_invalid_velocity_fraction": noisy_invalid_fraction,
             "invalid_velocity_fraction_difference": (
-                (noisy_invalid_velocity_raw_mass / noisy_total_raw_mass)
-                if noisy_total_raw_mass > 0
-                else 0.0
-            )
-            - (
-                (baseline_invalid_velocity_raw_mass / baseline_total_raw_mass)
-                if baseline_total_raw_mass > 0
-                else 0.0
+                noisy_invalid_fraction - baseline_invalid_fraction
             ),
+            "profile_density_floor": density_floor,
+            "x_profile_supported_bins": int(np.count_nonzero(support_masks["x"])),
+            "y_profile_supported_bins": int(np.count_nonzero(support_masks["y"])),
             "rho_field_l2_error": float(np.linalg.norm(rho_diff.ravel(), ord=2)),
             "rho_field_rmse": float(np.sqrt(np.mean(rho_diff**2))),
             "rho_field_linf_error": float(np.max(np.abs(rho_diff))),
@@ -277,47 +373,40 @@ def _save_velocity_profile_csv(
     comparison: dict[str, Any],
     step: int,
 ) -> None:
+    for axis in PROFILE_AXES:
+        _save_velocity_axis_profile_csv(output_dir, comparison, step, axis)
+
+def _save_velocity_axis_profile_csv(
+    output_dir: Path,
+    comparison: dict[str, Any],
+    step: int,
+    axis: str,
+) -> None:
     baseline = comparison["baseline_profiles"]
     noisy = comparison["noisy_profiles"]
-    with (output_dir / f"velocity_x_profiles_step_{step}.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as file:
-        writer = csv.writer(file)
-        writer.writerow(
-            [
-                "x",
-                "baseline_ux_density_weighted",
-                "noisy_ux_density_weighted",
-                "baseline_uy_density_weighted",
-                "noisy_uy_density_weighted",
-                "baseline_ux_arithmetic_mean",
-                "noisy_ux_arithmetic_mean",
-                "baseline_uy_arithmetic_mean",
-                "noisy_uy_arithmetic_mean",
-            ]
+    support_masks = comparison["profile_support_masks"]
+    masked_density_profiles = {
+        (label, component): _masked_profile(
+            profiles,
+            support_masks,
+            label,
+            _profile_key(component, axis, "density_weighted"),
         )
-        for x_index in range(len(baseline["ux_x_density_weighted"])):
-            writer.writerow(
-                [
-                    x_index,
-                    baseline["ux_x_density_weighted"][x_index],
-                    noisy["ux_x_density_weighted"][x_index],
-                    baseline["uy_x_density_weighted"][x_index],
-                    noisy["uy_x_density_weighted"][x_index],
-                    baseline["ux_x_mean"][x_index],
-                    noisy["ux_x_mean"][x_index],
-                    baseline["uy_x_mean"][x_index],
-                    noisy["uy_x_mean"][x_index],
-                ]
-            )
+        for label, profiles in (("baseline", baseline), ("noisy", noisy))
+        for component in VELOCITY_COMPONENTS
+    }
+    density_profile_key = _profile_key("ux", axis, "density_weighted")
 
-    with (output_dir / f"velocity_y_profiles_step_{step}.csv").open(
+    with (output_dir / f"velocity_{axis}_profiles_step_{step}.csv").open(
         "w", encoding="utf-8", newline=""
     ) as file:
         writer = csv.writer(file)
         writer.writerow(
             [
-                "y",
+                axis,
+                "profile_supported",
+                f"baseline_rho_{axis}",
+                f"noisy_rho_{axis}",
                 "baseline_ux_density_weighted",
                 "noisy_ux_density_weighted",
                 "baseline_uy_density_weighted",
@@ -328,18 +417,21 @@ def _save_velocity_profile_csv(
                 "noisy_uy_arithmetic_mean",
             ]
         )
-        for y_index in range(len(baseline["ux_y_density_weighted"])):
+        for index in range(len(baseline[density_profile_key])):
             writer.writerow(
                 [
-                    y_index,
-                    baseline["ux_y_density_weighted"][y_index],
-                    noisy["ux_y_density_weighted"][y_index],
-                    baseline["uy_y_density_weighted"][y_index],
-                    noisy["uy_y_density_weighted"][y_index],
-                    baseline["ux_y_mean"][y_index],
-                    noisy["ux_y_mean"][y_index],
-                    baseline["uy_y_mean"][y_index],
-                    noisy["uy_y_mean"][y_index],
+                    index,
+                    int(bool(support_masks[axis][index])),
+                    support_masks[f"baseline_rho_{axis}"][index],
+                    support_masks[f"noisy_rho_{axis}"][index],
+                    masked_density_profiles[("baseline", "ux")][index],
+                    masked_density_profiles[("noisy", "ux")][index],
+                    masked_density_profiles[("baseline", "uy")][index],
+                    masked_density_profiles[("noisy", "uy")][index],
+                    baseline[_profile_key("ux", axis, "mean")][index],
+                    noisy[_profile_key("ux", axis, "mean")][index],
+                    baseline[_profile_key("uy", axis, "mean")][index],
+                    noisy[_profile_key("uy", axis, "mean")][index],
                 ]
             )
 
@@ -365,57 +457,52 @@ def _save_velocity_plots(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    for axis in PROFILE_AXES:
+        _save_velocity_axis_plot(
+            output_dir,
+            comparison,
+            step=step,
+            axis=axis,
+            baseline_label=baseline_label,
+            noisy_label=noisy_label,
+            plt=plt,
+        )
+
+def _save_velocity_axis_plot(
+    output_dir: Path,
+    comparison: dict[str, Any],
+    step: int,
+    axis: str,
+    baseline_label: str,
+    noisy_label: str,
+    plt,
+) -> None:
     baseline = comparison["baseline_profiles"]
     noisy = comparison["noisy_profiles"]
+    support_masks = comparison["profile_support_masks"]
 
-    x_values = np.arange(len(baseline["ux_x_density_weighted"]))
+    values = np.arange(len(baseline[_profile_key("ux", axis, "density_weighted")]))
     fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
-    axes[0].plot(
-        x_values, baseline["ux_x_density_weighted"], marker="o", label=baseline_label
-    )
-    axes[0].plot(
-        x_values, noisy["ux_x_density_weighted"], marker="s", label=noisy_label
-    )
-    axes[0].set_ylabel("density-weighted u_x")
-    axes[0].set_title(f"Velocity profiles along x at timestep {step}")
-    axes[0].grid(True, alpha=0.25)
-    axes[0].legend()
-    axes[1].plot(
-        x_values, baseline["uy_x_density_weighted"], marker="o", label=baseline_label
-    )
-    axes[1].plot(
-        x_values, noisy["uy_x_density_weighted"], marker="s", label=noisy_label
-    )
-    axes[1].set_xlabel("x")
-    axes[1].set_ylabel("density-weighted u_y")
-    axes[1].grid(True, alpha=0.25)
-    axes[1].legend()
-    fig.tight_layout()
-    fig.savefig(output_dir / f"velocity_profiles_x_step_{step}.png", dpi=180)
-    plt.close(fig)
+    for subplot, component in zip(axes, VELOCITY_COMPONENTS, strict=True):
+        profile_name = _profile_key(component, axis, "density_weighted")
+        subplot.plot(
+            values,
+            _masked_profile(baseline, support_masks, "baseline", profile_name),
+            marker="o",
+            label=baseline_label,
+        )
+        subplot.plot(
+            values,
+            _masked_profile(noisy, support_masks, "noisy", profile_name),
+            marker="s",
+            label=noisy_label,
+        )
+        subplot.set_ylabel(f"density-weighted u_{component[-1]}")
+        subplot.grid(True, alpha=0.25)
+        subplot.legend()
 
-    y_values = np.arange(len(baseline["ux_y_density_weighted"]))
-    fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
-    axes[0].plot(
-        y_values, baseline["ux_y_density_weighted"], marker="o", label=baseline_label
-    )
-    axes[0].plot(
-        y_values, noisy["ux_y_density_weighted"], marker="s", label=noisy_label
-    )
-    axes[0].set_ylabel("density-weighted u_x")
-    axes[0].set_title(f"Velocity profiles along y at timestep {step}")
-    axes[0].grid(True, alpha=0.25)
-    axes[0].legend()
-    axes[1].plot(
-        y_values, baseline["uy_y_density_weighted"], marker="o", label=baseline_label
-    )
-    axes[1].plot(
-        y_values, noisy["uy_y_density_weighted"], marker="s", label=noisy_label
-    )
-    axes[1].set_xlabel("y")
-    axes[1].set_ylabel("density-weighted u_y")
-    axes[1].grid(True, alpha=0.25)
-    axes[1].legend()
+    axes[0].set_title(f"Velocity profiles along {axis} at timestep {step}")
+    axes[1].set_xlabel(axis)
     fig.tight_layout()
-    fig.savefig(output_dir / f"velocity_profiles_y_step_{step}.png", dpi=180)
+    fig.savefig(output_dir / f"velocity_profiles_{axis}_step_{step}.png", dpi=180)
     plt.close(fig)

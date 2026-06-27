@@ -11,6 +11,18 @@ import matplotlib.pyplot as plt
 from components.noise_analysis.experiment_utils import safe_path_name
 
 
+def _zero_low_density_profile(values, mask):
+    return [
+        value if bool(is_supported) else 0.0
+        for value, is_supported in zip(values, mask)
+    ]
+
+def _masked_x_profile(comparison: dict[str, Any], label: str, component: str):
+    return _zero_low_density_profile(
+        comparison[f"{label}_profiles"][f"{component}_x_density_weighted"],
+        comparison["profile_support_masks"][f"{label}_x"],
+    )
+
 def save_multi_hardware_velocity_metrics(analysis_dir: Path, metrics_rows: list[dict[str, Any]]) -> None:
     """Write the per-hardware velocity error metrics table."""
 
@@ -35,7 +47,6 @@ def save_multi_hardware_velocity_metrics(analysis_dir: Path, metrics_rows: list[
         writer.writeheader()
         writer.writerows(metrics_rows)
 
-
 def save_multi_hardware_velocity_x_outputs(
     step_dir: Path,
     timestep: int,
@@ -48,9 +59,18 @@ def save_multi_hardware_velocity_x_outputs(
         return
 
     step_dir.mkdir(parents=True, exist_ok=True)
-    reference = step_results[0]["comparison"]["baseline_profiles"]
-    x_count = len(reference["ux_x_density_weighted"])
+    reference_comparison = step_results[0]["comparison"]
+    reference_ux = _masked_x_profile(reference_comparison, "baseline", "ux")
+    reference_uy = _masked_x_profile(reference_comparison, "baseline", "uy")
+    x_count = len(reference_ux)
     hardware_column_names = _unique_hardware_column_names(step_results)
+    noisy_profiles_by_result = {
+        id(result): {
+            "ux": _masked_x_profile(result["comparison"], "noisy", "ux"),
+            "uy": _masked_x_profile(result["comparison"], "noisy", "uy"),
+        }
+        for result in step_results
+    }
 
     with (step_dir / f"multi_hardware_velocity_along_x_step_{timestep}.csv").open(
         "w",
@@ -60,24 +80,34 @@ def save_multi_hardware_velocity_x_outputs(
         fieldnames = ["x", "noiseless_reference_ux", "noiseless_reference_uy"]
         for result in step_results:
             hardware_name = hardware_column_names[id(result)]
-            fieldnames.extend([f"{hardware_name}_noisy_ux", f"{hardware_name}_noisy_uy"])
+            fieldnames.extend([
+                f"{hardware_name}_profile_supported",
+                f"{hardware_name}_baseline_rho_x",
+                f"{hardware_name}_noisy_rho_x",
+                f"{hardware_name}_noisy_ux",
+                f"{hardware_name}_noisy_uy",
+            ])
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for x_index in range(x_count):
             row = {
                 "x": x_index,
-                "noiseless_reference_ux": reference["ux_x_density_weighted"][x_index],
-                "noiseless_reference_uy": reference["uy_x_density_weighted"][x_index],
+                "noiseless_reference_ux": reference_ux[x_index],
+                "noiseless_reference_uy": reference_uy[x_index],
             }
             for result in step_results:
                 hardware_name = hardware_column_names[id(result)]
-                noisy = result["comparison"]["noisy_profiles"]
-                row[f"{hardware_name}_noisy_ux"] = noisy[
-                    "ux_x_density_weighted"
-                ][x_index]
-                row[f"{hardware_name}_noisy_uy"] = noisy[
-                    "uy_x_density_weighted"
-                ][x_index]
+                support = result["comparison"]["profile_support_masks"]
+                noisy_profiles = noisy_profiles_by_result[id(result)]
+                row[f"{hardware_name}_noisy_ux"] = noisy_profiles["ux"][x_index]
+                row[f"{hardware_name}_noisy_uy"] = noisy_profiles["uy"][x_index]
+                row[f"{hardware_name}_profile_supported"] = int(
+                    bool(support["x"][x_index])
+                )
+                row[f"{hardware_name}_baseline_rho_x"] = support["baseline_rho_x"][
+                    x_index
+                ]
+                row[f"{hardware_name}_noisy_rho_x"] = support["noisy_rho_x"][x_index]
             writer.writerow(row)
 
     _save_velocity_component_plot(
@@ -86,7 +116,7 @@ def save_multi_hardware_velocity_x_outputs(
         noise_kind=noise_kind,
         step_results=step_results,
         component="ux",
-        reference_values=reference["ux_x_density_weighted"],
+        reference_values=reference_ux,
         output_name=f"velocity_profile_along_x_step_{timestep}.png",
         title=f"Velocity Profile Along x, timestep {timestep}",
         ylabel="density-weighted u_x",
@@ -97,7 +127,7 @@ def save_multi_hardware_velocity_x_outputs(
         noise_kind=noise_kind,
         step_results=step_results,
         component="uy",
-        reference_values=reference["uy_x_density_weighted"],
+        reference_values=reference_uy,
         output_name=f"transverse_velocity_along_x_step_{timestep}.png",
         title=f"Transverse Velocity Along x, timestep {timestep}",
         ylabel="density-weighted u_y",
@@ -126,12 +156,10 @@ def _save_velocity_component_plot(
         label="Noiseless reference",
     )
     markers = ["s", "^", "D", "v"]
-    profile_key = f"{component}_x_density_weighted"
     for index, result in enumerate(step_results):
-        noisy = result["comparison"]["noisy_profiles"]
         ax.plot(
             x_values,
-            noisy[profile_key],
+            _masked_x_profile(result["comparison"], "noisy", component),
             marker=markers[index % len(markers)],
             label=f"{result['hardware_label']} ({noise_kind})",
         )
