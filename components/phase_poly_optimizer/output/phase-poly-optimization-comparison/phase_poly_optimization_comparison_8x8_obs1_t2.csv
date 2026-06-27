@@ -1,0 +1,7 @@
+topology,optimizer,algorithm,qlbm_grid,num_obstacles,num_timesteps,basis_gates,hardware_qubits,coupling_type,coupling_params,baseline_depth,optimized_depth,baseline_cx,optimized_cx,cx_reduction_percent,baseline_rz,optimized_rz,baseline_total_gates,optimized_total_gates,optimization_error
+all_to_all,all_to_all,ABQLBM,8x8,1,2,rz sx x cx,64,all_to_all,"{""num_qubits"": 64}",38139,33029,19059,17775,6.736974657642059,37149,29969,64792,56328,
+all_to_all,all_to_all,MSQLBM,8x8,1,2,rz sx x cx,64,all_to_all,"{""num_qubits"": 64}",75596,61936,41840,34872,16.65391969407266,83530,63605,148199,121306,
+all_to_all,all_to_all,SpaceTimeQLBM,8x8,1,2,rz sx x cx,64,all_to_all,"{""num_qubits"": 64}",12128,11377,4614,4582,0.693541395752059,10260,8554,18558,16820,
+2d_grid,architecture_aware,ABQLBM,8x8,1,2,rz sx x cx,64,2d_grid,"{""rows"": 8, ""cols"": 8}",63235,57079,52647,50040,4.951849108211294,37149,32085,98380,90709,
+2d_grid,architecture_aware,MSQLBM,8x8,1,2,rz sx x cx,64,2d_grid,"{""rows"": 8, ""cols"": 8}",130525,117172,122807,113873,7.274829610689944,83530,71662,229166,208364,
+2d_grid,architecture_aware,SpaceTimeQLBM,8x8,1,2,rz sx x cx,64,2d_grid,"{""rows"": 8, ""cols"": 8}",20438,19501,19242,19052,0.9874233447666563,10260,9091,33186,31827,

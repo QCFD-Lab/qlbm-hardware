@@ -1,0 +1,276 @@
+{
+  "hypothetical_2d_nn_rz_sx_x_cx": {
+    "id": "hypothetical 2d nearest-neighbor rz sx x cx",
+    "architecture": "hypothetical superconducting-style nearest-neighbor grid",
+    "device_name": "Hypothetical 2D NN CX",
+    "year_reported": 2026,
+    "num_qubits": 64,
+    "basis_gates": [
+      "rz",
+      "sx",
+      "x",
+      "cx"
+    ],
+    "coupling_type": "2d_grid",
+    "coupling_params": {
+      "rows": 8,
+      "cols": 8
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "sx": 25e-9,
+      "x": 25e-9,
+      "cx": 200e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "sx": 1.0,
+      "x": 1.0,
+      "cx": 1.0
+    },
+    "measurement_time_s": 1e-6,
+    "measurement_fidelity": 1.0,
+    "coherence": {
+      "t1_s": 100e-6,
+      "t2_s": 80e-6
+    }
+  },
+  "superconducting_google_willow_2024": {
+    "id": "google willow chip 2 2024",
+    "architecture": "superconducting transmon",
+    "device_name": "Willow (Chip 2)",
+    "year_reported": 2024,
+    "num_qubits": 105,
+    "basis_gates": [
+      "rz",
+      "sx",
+      "x",
+      "iswap"
+    ],
+    "coupling_type": "2d_grid",
+    "coupling_params": {
+      "rows": 10,
+      "cols": 11,
+      "disabled_qubits": [
+        105,
+        106,
+        107,
+        108,
+        109
+      ]
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "sx": 35e-9,
+      "x": 35e-9,
+      "iswap": 42e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "sx": 0.99964,
+      "x": 0.99964,
+      "iswap": 0.9986
+    },
+    "measurement_time_s": 1e-6,
+    "measurement_fidelity": 0.9933,
+    "coherence": {
+      "t1_s": 98e-6,
+      "t2_s": 89e-6
+    }
+  },
+  "superconducting_ibm_nighthawk_r1_2025": {
+    "id": "ibm nighthawk r1 2025",
+    "architecture": "superconducting fixed-frequency transmon with tunable couplers",
+    "device_name": "Nighthawk r1",
+    "year_reported": 2025,
+    "num_qubits": 120,
+    "basis_gates": [
+      "rz",
+      "sx",
+      "x",
+      "cz",
+      "rx"
+    ],
+    "coupling_type": "2d_grid",
+    "coupling_params": {
+      "rows": 10,
+      "cols": 12
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "sx": 35e-9,
+      "x": 35e-9,
+      "cz": 200e-9,
+      "rx": 35e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "sx": 0.99975,
+      "x": 0.99975,
+      "rx": 0.99975,
+      "cz": 0.99785
+    },
+    "measurement_time_s": null,
+    "measurement_fidelity": 0.98022,
+    "coherence": {
+      "t1_s": null,
+      "t2_s": null
+    }
+  },
+  "superconducting_ibm_eagle_r3_2024": {
+    "id": "ibm eagle r3 representative 2024",
+    "architecture": "superconducting fixed-frequency transmon",
+    "device_name": "IBM Eagle r3",
+    "year_reported": 2024,
+    "num_qubits": 127,
+    "basis_gates": [
+      "rz",
+      "sx",
+      "x",
+      "ecr"
+    ],
+    "coupling_type": "heavy_hex",
+    "coupling_params": {
+      "backend": "FakeKyoto"
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "sx": 35e-9,
+      "x": 35e-9,
+      "ecr": 660e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "sx": 0.99976,
+      "x": 0.99976,
+      "ecr": 0.9911
+    },
+    "measurement_time_s": 1e-6,
+    "measurement_fidelity": 0.9865,
+    "coherence": {
+      "t1_s": 263e-6,
+      "t2_s": 146e-6
+    }
+  },
+  "trapped_ion_quantinuum_h2_2025": {
+    "id": "quantinuum h2 2025",
+    "architecture": "trapped-ion QCCD",
+    "device_name": "Quantinuum System Model H2",
+    "year_reported": 2025,
+    "num_qubits": 56,
+    "basis_gates": [
+      "rz",
+      "rxy",
+      "zz",
+      "rzz"
+    ],
+    "transpile_basis_gates": [
+      "rz",
+      "rx",
+      "ry",
+      "rzz"
+    ],
+    "gate_time_aliases": {
+      "rx": "rxy",
+      "ry": "rxy"
+    },
+    "coupling_type": "all_to_all",
+    "coupling_params": {
+      "fully_connected_qubits": 56
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "rxy": 10e-6,
+      "zz": 200e-6,
+      "rzz": 200e-6
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "rxy": 0.9999,
+      "zz": 0.999,
+      "rzz": 0.999
+    },
+    "measurement_time_s": 1e-3,
+    "measurement_fidelity": 0.9985,
+    "coherence": {
+      "t1_s": null,
+      "t2_s": 1.0
+    }
+  },
+  "neutral_atom_rydberg": {
+    "id": "neutral_atom_rydberg_evered_2023",
+    "architecture": "neutral-atom Rydberg array",
+    "device_name": "Neutral-atom Rydberg processor",
+    "year_reported": 2023,
+    "num_qubits": 60,
+    "basis_gates": [
+      "rx",
+      "ry",
+      "rz",
+      "cz"
+    ],
+    "coupling_type": "all_to_all",
+    "coupling_params": {
+      "max_parallel_cz_qubits": 60
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "rx": 250e-9,
+      "ry": 250e-9,
+      "cz": 416e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "rx": 0.9997,
+      "ry": 0.9997,
+      "cz": 0.995
+    },
+    "measurement_time_s": 5e-3,
+    "measurement_fidelity": 0.99,
+    "coherence": {
+      "t1_s": null,
+      "t2_s": 1.0
+    }
+  },
+  "silicon_spin_intel_tunnel_falls_2024": {
+    "id": "intel tunnel falls 2024",
+    "architecture": "silicon spin qubit",
+    "device_name": "Tunnel Falls",
+    "year_reported": 2024,
+    "num_qubits": 12,
+    "basis_gates": [
+      "rz",
+      "x",
+      "cz"
+    ],
+    "transpile_basis_gates": [
+      "rz",
+      "rx",
+      "x",
+      "cz"
+    ],
+    "gate_time_aliases": {
+      "rx": "x"
+    },
+    "coupling_type": "line",
+    "coupling_params": {
+      "num_qubits": 30
+    },
+    "gate_times_s": {
+      "rz": 0.0,
+      "x": 70e-9,
+      "cz": 100e-9
+    },
+    "gate_fidelities": {
+      "rz": 1.0,
+      "x": 0.9989,
+      "cz": 0.9937
+    },
+    "measurement_time_s": 1e-6,
+    "measurement_fidelity": 0.9995,
+    "coherence": {
+      "t1_s": 9.5,
+      "t2_s": 1.9e-3
+    }
+  }
+}

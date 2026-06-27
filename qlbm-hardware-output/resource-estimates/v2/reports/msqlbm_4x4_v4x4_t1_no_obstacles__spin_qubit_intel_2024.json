@@ -1,0 +1,78 @@
+{
+  "label": "msqlbm_4x4_v4x4_t1_no_obstacles",
+  "hardware": {
+    "id": "intel 2024",
+    "architecture": "silicon spin qubit (Si/SiGe quantum dots)",
+    "device_name": "Tunnel Falls 12QD device",
+    "year_reported": 2024,
+    "num_qubits": 12,
+    "topology_num_qubits": 12,
+    "basis_gates": [
+      "rz",
+      "rx",
+      "ry",
+      "cz",
+      "cx"
+    ],
+    "coupling_type": "linear_chain",
+    "num_couplings": 22,
+    "directed_coupling": false,
+    "validation_warnings": []
+  },
+  "qlbm": {
+    "algorithm": "MSQLBM",
+    "lattice": {
+      "lattice": {
+        "dim": {
+          "x": 4,
+          "y": 4
+        },
+        "velocities": {
+          "x": 4,
+          "y": 4
+        }
+      },
+      "geometry": []
+    },
+    "num_timesteps": 1
+  },
+  "logical": {
+    "num_qubits": 13,
+    "num_clbits": 4,
+    "depth": 123,
+    "size": 291,
+    "width": 17,
+    "op_counts": {
+      "h": 75,
+      "mcphase": 72,
+      "x": 46,
+      "cp": 36,
+      "swap": 36,
+      "cx": 16,
+      "mcmt": 6,
+      "measure": 4
+    },
+    "num_1q_ops": 121,
+    "num_2q_ops": 88,
+    "num_3q_plus_ops": 78,
+    "num_measure": 4,
+    "num_reset": 0,
+    "num_barrier": 0,
+    "num_other_ops": 0,
+    "two_qubit_fraction": 0.30662020905923343
+  },
+  "logical_capacity": {
+    "logical_qubits": 13,
+    "available_qubits": 12,
+    "qubit_capacity_ok": false
+  },
+  "transpiled": null,
+  "transpiled_circuit": null,
+  "transpiled_compatibility": null,
+  "transpiled_time": null,
+  "transpiled_compact": null,
+  "transpiled_compact_circuit": null,
+  "section_analysis": null,
+  "overheads": null,
+  "transpile_error": "CircuitTooWideForTarget('Number of qubits (13) in circuit-2052 is greater than maximum (12) in the coupling_map')"
+}

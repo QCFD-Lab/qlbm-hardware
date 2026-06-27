@@ -1,0 +1,19 @@
+algorithm,grid,num_obstacles,num_timesteps,hardware_label,logical_qubits,transpiled_compact_qubits,logical_gate_count,transpiled_gate_count,logical_two_qubit_count,transpiled_two_qubit_count,logical_circuit_depth,transpiled_circuit_depth,max_2q_section,max_2q_section_count,max_time_section,max_time_section_critical_path_s
+SpaceTimeQLBM,8x8,0,1,SC Willow,26,27,199,23246,38,4310,60,11760,initialization,3570,initialization,0.0003191860000000445
+SpaceTimeQLBM,8x8,0,1,SC Nighthawk,26,30,199,5790,38,1952,60,2824,initialization,1599,initialization,0.00032029000000001056
+SpaceTimeQLBM,8x8,0,1,SC Eagle,26,31,199,18791,38,3346,60,7717,initialization,2820,initialization,0.0018015199999999916
+SpaceTimeQLBM,8x8,0,1,Trapped-ion,26,26,199,4472,38,1037,60,2408,initialization,870,initialization,0.16435000000000377
+SpaceTimeQLBM,8x8,0,1,Neutral-atom,26,26,199,1786,38,692,60,1047,initialization,490,measurement,0.005
+SpaceTimeQLBM,8x8,0,1,Silicon-spin$^{\dagger}$,26,26,199,14663,38,4923,60,5385,initialization,3952,initialization,0.000440910000000018
+SpaceTimeQLBM,16x16,0,1,SC Willow,28,29,243,32872,38,6100,61,14726,initialization,5136,initialization,0.00040553800000006656
+SpaceTimeQLBM,16x16,0,1,SC Nighthawk,28,29,243,8168,38,2818,61,3699,initialization,2184,initialization,0.0004016100000000138
+SpaceTimeQLBM,16x16,0,1,SC Eagle,28,28,243,26709,38,4781,61,10557,initialization,3753,initialization,0.0023459699999998306
+SpaceTimeQLBM,16x16,0,1,Trapped-ion,28,28,243,6035,38,1401,61,2804,initialization,1230,initialization,0.18938000000000568
+SpaceTimeQLBM,16x16,0,1,Neutral-atom,28,28,243,2182,38,864,61,1214,initialization,646,measurement,0.005
+SpaceTimeQLBM,16x16,0,1,Silicon-spin$^{\dagger}$,28,28,243,18811,38,6379,61,6677,initialization,5239,initialization,0.0005422700000000061
+SpaceTimeQLBM,32x32,0,1,SC Willow,30,35,287,41933,38,7770,61,18053,initialization,6702,initialization,0.0005170200000000952
+SpaceTimeQLBM,32x32,0,1,SC Nighthawk,30,32,287,10945,38,3805,61,4933,initialization,2797,initialization,0.0005145850000000186
+SpaceTimeQLBM,32x32,0,1,SC Eagle,30,37,287,34456,38,6165,61,12740,initialization,4980,initialization,0.00308105499999957
+SpaceTimeQLBM,32x32,0,1,Trapped-ion,30,30,287,7616,38,1765,61,3314,initialization,1590,initialization,0.22299000000000824
+SpaceTimeQLBM,32x32,0,1,Neutral-atom,30,30,287,2585,38,1036,61,1416,initialization,802,measurement,0.005
+SpaceTimeQLBM,32x32,0,1,Silicon-spin$^{\dagger}$,30,30,287,25193,38,8541,61,8557,initialization,7034,initialization,0.0006124399999999868

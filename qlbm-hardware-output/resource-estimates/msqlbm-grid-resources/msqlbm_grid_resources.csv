@@ -1,0 +1,19 @@
+algorithm,grid,num_obstacles,num_timesteps,hardware_label,logical_qubits,transpiled_compact_qubits,logical_gate_count,transpiled_gate_count,logical_two_qubit_count,transpiled_two_qubit_count,logical_circuit_depth,transpiled_circuit_depth,max_2q_section,max_2q_section_count,max_time_section,max_time_section_critical_path_s
+MSQLBM,8x8,0,1,SC Willow,15,15,439,22564,160,4164,179,11200,timestep,4164,timestep,0.0003410330000000502
+MSQLBM,8x8,0,1,SC Nighthawk,15,15,439,6750,160,2106,179,3190,timestep,2106,timestep,0.00039438500000001396
+MSQLBM,8x8,0,1,SC Eagle,15,15,439,12989,160,2277,179,5337,timestep,2277,timestep,0.0014231649999999947
+MSQLBM,8x8,0,1,Trapped-ion,15,13,439,3042,160,780,179,1310,timestep,780,timestep,0.14047000000000195
+MSQLBM,8x8,0,1,Neutral-atom,15,13,439,2739,160,996,179,1310,timestep,996,measurement,0.005
+MSQLBM,8x8,0,1,Silicon-spin$^{\dagger}$,15,13,439,7305,160,2355,179,3034,timestep,2355,timestep,0.0002581000000000012
+MSQLBM,16x16,0,1,SC Willow,17,17,659,35435,304,6552,235,15771,timestep,6552,timestep,0.0005002690000000908
+MSQLBM,16x16,0,1,SC Nighthawk,17,17,659,10585,304,3324,235,4672,timestep,3324,timestep,0.0005938300000000228
+MSQLBM,16x16,0,1,SC Eagle,17,18,659,21893,304,3834,235,8626,timestep,3834,timestep,0.0023782949999998112
+MSQLBM,16x16,0,1,Trapped-ion,17,15,659,4560,304,1176,235,1732,timestep,1176,timestep,0.19490000000000476
+MSQLBM,16x16,0,1,Neutral-atom,17,15,659,4219,304,1536,235,1764,timestep,1536,measurement,0.005
+MSQLBM,16x16,0,1,Silicon-spin$^{\dagger}$,17,15,659,12973,304,4173,235,5518,timestep,4173,timestep,0.00046869000000002376
+MSQLBM,32x32,0,1,SC Willow,19,21,879,48998,448,9036,291,22092,timestep,9036,timestep,0.0006908720000001394
+MSQLBM,32x32,0,1,SC Nighthawk,19,21,879,14349,448,4536,291,5884,timestep,4536,timestep,0.0007804250000000306
+MSQLBM,32x32,0,1,SC Eagle,19,17,879,30175,448,5433,291,10795,timestep,5433,timestep,0.0032216849999995626
+MSQLBM,32x32,0,1,Trapped-ion,19,17,879,5700,448,1500,291,2154,timestep,1500,timestep,0.23532000000000683
+MSQLBM,32x32,0,1,Neutral-atom,19,17,879,5555,448,2040,291,2218,timestep,2040,measurement,0.005
+MSQLBM,32x32,0,1,Silicon-spin$^{\dagger}$,19,17,879,18521,448,5943,291,6550,timestep,5943,timestep,0.0005755299999999976

@@ -1,0 +1,3 @@
+lattice,backend,compiler,scheduler,opt_level,virtual_qubits,physical_qubits,depth,width,size,tensor_factors,twoq_gate_count,swap_count,op_counts_json,scheduled_duration_s,scheduled_duration_unit
+2D-MSQLBM,ibm_algiers_v2,qiskit,alap,2,20,27,347189,27,627855,7,309211,0,"{""cx"": 309211, ""rz"": 226953, ""sx"": 85127, ""x"": 6564}",,
+2D-MSQLBM,ibm_algiers_v2,qiskit,asap,2,20,27,347189,27,627855,7,309211,0,"{""cx"": 309211, ""rz"": 226953, ""sx"": 85127, ""x"": 6564}",,

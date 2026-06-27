@@ -1,0 +1,20 @@
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrr}
+\hline
+Metric & ABQLBM & MSQLBM & SpaceTimeQLBM \\
+\hline
+Direct HW depth & 290591 & 590069 & 48515 \\
+IR-opt HW depth & 272812 & 547461 & 47793 \\
+Direct HW 2Q & 54408 & 123746 & 10290 \\
+IR-opt HW 2Q & 51634 & 115558 & 10190 \\
+HW 2Q red. (\%) & 5.10 & 6.62 & 0.97 \\
+Direct HW RZ & 345039 & 784246 & 64725 \\
+IR-opt HW RZ & 325805 & 729498 & 63756 \\
+Direct HW gates & 648585 & 1476270 & 122402 \\
+IR-opt HW gates & 614094 & 1376488 & 120883 \\
+\hline
+\end{tabular}
+\caption{Comparison of direct hardware transpilation against the full intermediate-representation phase-polynomial workflow for Willow (Chip 2) using the architecture-aware optimizer. The direct hardware circuit is compiled to the native basis rz sx x iswap; the optimized workflow uses the intermediate basis rz sx x cx before recompilation to the same hardware target. The circuits use an 8x8 lattice with 1 bounceback obstacle and 1 timestep.}
+\label{tab:phase-poly-ir-flow-comparison-8x8-obs1-t1-google-willow-2024-architecture-aware}
+\end{table}

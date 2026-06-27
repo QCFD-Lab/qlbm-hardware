@@ -1,0 +1,6 @@
+Component,ABQLBM,MSQLBM,STQBM
+Initialization,3.0,0.0,490.0
+Streaming,1620.0,332.0,24.0
+Reflection / boundary,12232.0,40500.0,308.0
+Collision,0.0,0.0,130.0
+Ancilla prep.,0.0,8.0,0.0
