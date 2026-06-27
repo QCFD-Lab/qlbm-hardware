@@ -1,3 +1,0 @@
-label,stage,num_qubits,num_clbits,depth,size,num_1q_ops,num_2qplus_ops,num_measure,num_reset,num_barrier,op_counts_json,op_counts_1q_json,op_counts_2qplus_json
-MSQLBM_3D_8x8x8_v4x4x4_no_obstacles,logical,23,0,205,636,228,408,0,0,0,"{""cx"": 24, ""h"": 162, ""cp"": 162, ""swap"": 54, ""mcphase"": 162, ""x"": 66, ""mcmt"": 6}","{""h"": 162, ""x"": 66}","{""cx"": 24, ""cp"": 162, ""swap"": 54, ""mcphase"": 162, ""mcmt"": 6}"
-MSQLBM_3D_8x8x8_v4x4x4_no_obstacles,transpiled,23,0,1652,3411,1917,1494,0,0,0,"{""rz"": 1737, ""sx"": 114, ""cx"": 1494, ""x"": 66}","{""rz"": 1737, ""sx"": 114, ""x"": 66}","{""cx"": 1494}"

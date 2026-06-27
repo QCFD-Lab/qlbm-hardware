@@ -61,9 +61,9 @@
     },
     "gate_times_s": {
       "rz": 0.0,
-      "sx": 25e-9,
-      "x": 25e-9,
-      "iswap": 120e-9
+      "sx": 35e-9,
+      "x": 35e-9,
+      "iswap": 42e-9
     },
     "gate_fidelities": {
       "rz": 1.0,
@@ -148,8 +148,8 @@
     "measurement_time_s": 1e-6,
     "measurement_fidelity": 0.9865,
     "coherence": {
-      "t1_s": 214e-6,
-      "t2_s": 192e-6
+      "t1_s": 263e-6,
+      "t2_s": 146e-6
     }
   },
   "trapped_ion_quantinuum_h2_2025": {
@@ -197,8 +197,8 @@
       "t2_s": 1.0
     }
   },
-  "neutral_atom_aws_2023": {
-    "id": "neutral_atom_evered_aws_quera_harvard_2023",
+  "neutral_atom_rydberg": {
+    "id": "neutral_atom_rydberg_evered_2023",
     "architecture": "neutral-atom Rydberg array",
     "device_name": "Neutral-atom Rydberg processor",
     "year_reported": 2023,
@@ -215,9 +215,9 @@
     },
     "gate_times_s": {
       "rz": 0.0,
-      "rx": 1e-6,
-      "ry": 1e-6,
-      "cz": 2.6e-7
+      "rx": 250e-9,
+      "ry": 250e-9,
+      "cz": 416e-9
     },
     "gate_fidelities": {
       "rz": 1.0,
@@ -254,12 +254,12 @@
     },
     "coupling_type": "line",
     "coupling_params": {
-      "num_qubits": 12
+      "num_qubits": 30
     },
     "gate_times_s": {
       "rz": 0.0,
-      "x": 400e-9,
-      "cz": 200e-9
+      "x": 70e-9,
+      "cz": 100e-9
     },
     "gate_fidelities": {
       "rz": 1.0,

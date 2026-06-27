@@ -119,10 +119,10 @@
   },
   "transpiled_time": {
     "timing_model": "qiskit_asap_schedule",
-    "scheduled_duration_s": 0.0006219849999999978,
-    "max_idle_time_s": 0.0005456499999999972,
-    "serial_time_s": 0.0011620399999999998,
-    "critical_path_time_s": 0.0008970499999999785,
+    "scheduled_duration_s": 0.0003452110000000509,
+    "max_idle_time_s": 0.00030275000000004024,
+    "serial_time_s": 0.000798104,
+    "critical_path_time_s": 0.0005080100000000909,
     "unknown_gate_times": [],
     "measurement_time_included": true,
     "warnings": []
@@ -159,8 +159,8 @@
         "num_2q_ops": 0,
         "depth": 3,
         "size": 29,
-        "critical_path_time_s": 5e-08,
-        "serial_time_s": 2.75e-07,
+        "critical_path_time_s": 7e-08,
+        "serial_time_s": 3.85e-07,
         "op_counts": {
           "rz": 18,
           "sx": 9,
@@ -173,8 +173,8 @@
         "num_2q_ops": 6552,
         "depth": 15770,
         "size": 35435,
-        "critical_path_time_s": 0.000889414999999978,
-        "serial_time_s": 0.0011541649999999997,
+        "critical_path_time_s": 0.0005002690000000908,
+        "serial_time_s": 0.0007902790000000001,
         "op_counts": {
           "rz": 14166,
           "sx": 9377,
@@ -211,8 +211,8 @@
       "num_2q_ops": 6552,
       "depth": 15770,
       "size": 35435,
-      "critical_path_time_s": 0.000889414999999978,
-      "serial_time_s": 0.0011541649999999997,
+      "critical_path_time_s": 0.0005002690000000908,
+      "serial_time_s": 0.0007902790000000001,
       "op_counts": {
         "rz": 14166,
         "sx": 9377,
@@ -226,8 +226,8 @@
       "num_2q_ops": 6552,
       "depth": 15770,
       "size": 35435,
-      "critical_path_time_s": 0.000889414999999978,
-      "serial_time_s": 0.0011541649999999997,
+      "critical_path_time_s": 0.0005002690000000908,
+      "serial_time_s": 0.0007902790000000001,
       "op_counts": {
         "rz": 14166,
         "sx": 9377,
