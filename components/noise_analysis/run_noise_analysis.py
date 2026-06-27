@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sys
 import time
 from pathlib import Path
@@ -10,30 +9,24 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
-
-os.environ.setdefault(
-    "MPLCONFIGDIR",
-    str(Path(__file__).resolve().parent / "output" / ".matplotlib"),
-)
-
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT, Path(__file__).resolve().parent):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from components.noise_analysis.density_experiments import (  # noqa: E402
+from components.noise_analysis.density_experiments import (
     run_density_error_growth_comparison,
     run_depolarizing_probability_sweep,
     run_multi_hardware_density_depolarizing_comparison,
     run_noiseless_vs_noise_density_comparison,
 )
-from components.noise_analysis.experiment_utils import (  # noqa: E402
+from components.noise_analysis.experiment_utils import (
     DEFAULT_CONFIG_PATH,
     DEFAULT_OUTPUT_ROOT,
 )
-from components.noise_analysis.generic_experiments import (  # noqa: E402
+from components.noise_analysis.generic_experiments import (
     run_hardware_noise_analysis,
 )
-from components.noise_analysis.velocity_experiments import (  # noqa: E402
+from components.noise_analysis.velocity_experiments import (
     run_multi_hardware_velocity_profile_comparison,
     run_noiseless_vs_noise_velocity_profile_comparison,
     run_velocity_profile_comparison_batch,

@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from components.resource_estimator.experiment_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (
     build_error_row,
     deterministic_obstacles,
     make_case_spec,
