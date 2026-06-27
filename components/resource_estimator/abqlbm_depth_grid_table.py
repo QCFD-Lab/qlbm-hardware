@@ -77,15 +77,6 @@ def build_abqlbm_case(grid_x: int, grid_y: int, num_timesteps: int = 1):
     return full_circuit, sectioned_circuit, section_names
 
 
-def build_abqlbm_circuit(grid_x: int, grid_y: int, num_timesteps: int = 1):
-    """Build an ABQLBM logical circuit for a rectangular grid with no obstacles."""
-    return build_abqlbm_case(
-        grid_x,
-        grid_y,
-        num_timesteps,
-    )[0]
-
-
 def section_summary(report: Dict[str, Any]) -> Dict[str, Any]:
     """Return compact section-level metrics from an estimator report."""
     section_analysis = report.get("section_analysis") or {}

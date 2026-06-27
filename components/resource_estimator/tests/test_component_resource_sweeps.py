@@ -12,7 +12,7 @@ from components.resource_estimator.component_resource_sweeps import (
     make_component_csv_rows,
     msqlbm_component_sections,
 )
-from components.resource_estimator.thesis_resource_sweeps import (
+from components.resource_estimator.experiment_resource_sweeps import (
     make_case_spec,
 )
 

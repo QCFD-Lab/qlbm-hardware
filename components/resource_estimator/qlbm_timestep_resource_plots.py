@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
@@ -21,23 +22,18 @@ for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-import matplotlib  # noqa: E402
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-
-from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
-from components.resource_estimator.benchmark_qlbm_resources_v2 import (  # noqa: E402
+from components.resource_estimator import QLBMResourceEstimator
+from components.resource_estimator.benchmark_qlbm_resources_v2 import (
     build_full_logical_circuit,
     build_sectioned_logical_circuit,
     json_safe,
     load_hardware_configs,
 )
-from components.resource_estimator.thesis_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (
     deterministic_obstacles,
 )
-from qlbm import ABLattice, MSLattice, SpaceTimeLattice  # noqa: E402
-from qlbm.components import (  # noqa: E402
+from qlbm import ABLattice, MSLattice, SpaceTimeLattice
+from qlbm.components import (
     ABGridMeasurement,
     ABInitialConditions,
     ABQLBM,
@@ -46,13 +42,19 @@ from qlbm.components import (  # noqa: E402
     MSInitialConditions,
     MSQLBM,
 )
-from qlbm.components.spacetime import (  # noqa: E402
+from qlbm.components.spacetime import (
     SpaceTimeGridVelocityMeasurement,
     SpaceTimeQLBM,
 )
-from qlbm.components.spacetime.initial.pointwise import (  # noqa: E402
+from qlbm.components.spacetime.initial.pointwise import (
     PointWiseSpaceTimeInitialConditions,
 )
+
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 DEFAULT_CONFIG_PATH = (
