@@ -190,15 +190,6 @@ def synthesize_linear_transform_all_to_all(matrix_rows: Sequence[BitVec]) -> Qua
 
 @dataclass
 class A2APhasePoly:
-    """
-    All-to-all phase-polynomial optimizer with the same public shape as
-    `ArchitectureAwarePhasePolyOptimizer`.
-
-    The class accepts the old `A2APhasePoly(circuit).optimize()` style as a
-    compatibility convenience, but the preferred interface is
-    `A2APhasePoly().optimize(circuit, coupling_map=None)`.
-    """
-
     circuit: Optional[QuantumCircuit] = None
     allow_barriers: bool = True
     debug: bool = False
@@ -253,19 +244,12 @@ class A2APhasePoly:
     def optimize(
         self,
         circuit: Optional[QuantumCircuit] = None,
-        coupling_map: Optional[CouplingMap] = None,
-        *,
         debug: Optional[bool] = None,
     ) -> QuantumCircuit:
         """
         Optimize all maximal {cx, rz} phase-polynomial blocks.
-
-        `coupling_map` is accepted for interface parity with the architecture-aware
-        optimizer and intentionally ignored because this optimizer assumes all-to-all
-        coupling.
         """
 
-        del coupling_map
         if debug is not None:
             self.debug = debug
 
