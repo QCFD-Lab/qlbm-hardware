@@ -1,4 +1,4 @@
-"""Different types of components."""
+"""Resource estimation components"""
 
 from .resource_estimator import QLBMResourceEstimator
 from .phase_poly_optimizer import A2APhasePoly

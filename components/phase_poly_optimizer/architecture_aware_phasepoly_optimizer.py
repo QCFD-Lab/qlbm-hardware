@@ -55,11 +55,6 @@ class PhaseColumn:
 class ArchitectureGraph:
     """
     Minimal undirected architecture wrapper built from a Qiskit CouplingMap.
-
-    Current limitation:
-    if the coupling map contains more qubits than the circuit, this wrapper uses only
-    qubits [0, ..., num_qubits-1]. That is enough to implement and test the synthesis
-    algorithm itself, but a separate placement stage should be added later.
     """
 
     graph: nx.Graph
@@ -107,12 +102,6 @@ class ArchitectureGraph:
             Edges emitted in the first phase of the tree walk.
         bottom_up_edges:
             Edges emitted in the second phase of the tree walk.
-
-        Notes
-        -----
-        In the full-reduction phase (`upper=False`), edges are only bidirectional inside
-        `rec_nodes`. Outside that set, we keep only the orientation from larger index
-        to smaller index, which mirrors the reference implementation's restriction.
         """
         usable = list(dict.fromkeys(int(x) for x in usable_nodes))
         required = list(dict.fromkeys(int(x) for x in nodes))
@@ -267,7 +256,7 @@ class _RecursiveSynthState:
         Emit CX(control, target).
 
         Important convention:
-        - For the remaining phase-polynomial matrix P, commuting this CNOT through the frontier
+        - For the remaining phase-polynomial matrix P, commuting this CNOT
           updates the CONTROL row as control ^= target.
         - For the emitted circuit's actual forward linear transform, Qiskit CX updates the TARGET
           row as target ^= control.
@@ -411,11 +400,7 @@ def _steiner_reduce_column_recursive(
     emit_row_add,
 ) -> None:
     """
-    Closer Qiskit analogue of the repo's `steiner_reduce_column(...)`.
-
-    It uses the repo-style two-phase tree walk:
-    1. top-down pass
-    2. bottom-up pass
+    Qiskit analogue of the repo's `steiner_reduce_column(...)`.
     """
     if len(nodes) <= 1:
         return
@@ -443,7 +428,6 @@ def _steiner_reduce_column_recursive(
                 f"Upper Steiner reduction failed to create pivot 1 at row {root} for column {col}."
             )
     else:
-        # Repo behaviour in the full-reduction phase.
         for s0, s1 in top_down:
             if work[s1][col] == 0:
                 emit_row_add(s0, s1)
@@ -457,17 +441,11 @@ def _steiner_reduce_column_recursive(
 def synthesize_linear_transform_steiner_gauss(
     matrix_rows: Sequence[BitVec],
     coupling_map: CouplingMap,
-    *,
     reduce_order: Optional[Sequence[int]] = None,
 ) -> QuantumCircuit:
     """
     Architecture-aware synthesis of an invertible GF(2) linear transform using a
-    recursive Steiner-Gauss structure closer to the reference repo.
-
-    This version mirrors the repo at a higher level:
-    - first perform an upper-triangular pass
-    - collect pivot columns
-    - then do the full reduction recursively on shortest-path subproblems
+    recursive Steiner-Gauss structure.
     """
     work = gf2_matrix_from_rows(matrix_rows)
     n = len(work)
@@ -628,7 +606,6 @@ def synthesize_linear_transform_graph_exact(
 
 def _non_cutting_peel_order(
     architecture: ArchitectureGraph,
-    *,
     prefer_high_index: bool,
     dfs_priority: Optional[Dict[int, int]] = None,
 ) -> List[int]:
@@ -703,7 +680,6 @@ def _candidate_reduce_orders(architecture: ArchitectureGraph, n: int) -> List[Tu
 def synthesize_linear_transform_architecture_aware_result(
     matrix_rows: Sequence[BitVec],
     coupling_map: CouplingMap,
-    *,
     reduce_order: Optional[Sequence[int]] = None,
 ) -> LinearSynthesisResult:
     n = len(matrix_rows)
@@ -748,7 +724,6 @@ def synthesize_linear_transform_architecture_aware_result(
 def synthesize_linear_transform_architecture_aware(
     matrix_rows: Sequence[BitVec],
     coupling_map: CouplingMap,
-    *,
     reduce_order: Optional[Sequence[int]] = None,
 ) -> QuantumCircuit:
     """
@@ -783,22 +758,6 @@ def _dedup_edges_preserve_order(edges: Sequence[Tuple[int, int]]) -> List[Tuple[
 
 @dataclass
 class ArchitectureAwarePhasePolyOptimizer:
-    """
-    Stepwise Qiskit port of the Meijer-van de Griend / Duncan architecture-aware
-    phase-polynomial synthesis algorithm.
-
-    Current stage:
-    - finds maximal phase-polynomial blocks in mixed circuits
-    - extracts a faithful internal representation
-    - synthesizes the phase-support part using the paper's recursion
-    - computes the final residual linear transform A * P'^-1
-    - synthesizes that residual natively with a Steiner-Gauss-style architecture-aware routine
-    - optionally keeps the original block if the synthesized result is worse by cost
-
-    Remaining work:
-    - making the Steiner-Gauss port closer to the reference implementation for better CX counts
-    """
-
     allow_barriers: bool = True
     debug: bool = False
     keep_original_if_worse: bool = True

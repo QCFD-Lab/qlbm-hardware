@@ -1,4 +1,4 @@
-"""Small QLBM case builders for hardware noise-analysis experiments.
+"""Reference QLBM cases for hardware noise-analysis experiments.
 
 Edit the lattice geometry and initial conditions inside the builder functions.
 The runner composes the returned components into full measured logical
@@ -39,7 +39,7 @@ from qlbm.components.spacetime.initial.pointwise import (
 
 @dataclass(frozen=True)
 class QLBMCase:
-    """A hardware-transpilable QLBM case."""
+    """Logical QLBM circuits and metadata used by a noise experiment."""
 
     label: str
     lattice: ABLattice | MSLattice | SpaceTimeLattice
@@ -55,13 +55,11 @@ class QLBMCase:
 
 
 def component_circuit(component: Any) -> QuantumCircuit:
-    """Return a Qiskit circuit from either a QLBM component or circuit."""
-
+    """Extract a circuit from a QLBM component, or pass a circuit through."""
     return component.circuit if hasattr(component, "circuit") else component
 
-
 def build_full_logical_circuit(case: QLBMCase, num_steps: int) -> QuantumCircuit:
-    """Build a full measured logical QLBM circuit without section boundaries."""
+    """Compose initialization, repeated evolution, postprocessing, and measurement."""
 
     initial_circuit = component_circuit(case.initial_conditions)
     algorithm_circuit = component_circuit(case.algorithm)
@@ -77,9 +75,8 @@ def build_full_logical_circuit(case: QLBMCase, num_steps: int) -> QuantumCircuit
     return circuit
 
 
-def build_abqlbm_4x8_0_case(num_timesteps: int, measure_velocity_qubits: bool = False) -> QLBMCase:
-    """Build an ABQLBM circuit for 8x4 D2Q9 no obstacles
-    """
+def build_abqlbm_8x4_d2q9_case(num_timesteps: int,measure_velocity_qubits: bool = False) -> QLBMCase:
+    """Build the 8x4 D2Q9 ABQLBM reference case without obstacles."""
 
     lattice_data = {
         "lattice": {"dim": {"x": 8, "y": 4}, "velocities": "D2Q9"},
@@ -116,8 +113,7 @@ def build_abqlbm_4x8_0_case(num_timesteps: int, measure_velocity_qubits: bool = 
 
 
 def build_msqlbm_case(num_timesteps: int) -> QLBMCase:
-    """Build an MSQLBM case. D2Q4 no obstacles.
-    """
+    """Build the 4x4 MSQLBM reference case without obstacles."""
 
     lattice_data = {
         "lattice": {"dim": {"x": 4, "y": 4}, "velocities": {"x": 4, "y": 4}},
@@ -150,7 +146,7 @@ def build_msqlbm_case(num_timesteps: int) -> QLBMCase:
 
 
 def build_spacetime_case(num_timesteps: int) -> QLBMCase:
-    """Build a SpaceTimeQLBM case.
+    """Build the 4x4 D2Q4 SpaceTimeQLBM reference case.
 
     Manually edit ``lattice_data`` and ``initial_conditions`` here for
     SpaceTimeQLBM geometry and initial-state experiments. Space-time lattices
@@ -189,7 +185,7 @@ def build_spacetime_case(num_timesteps: int) -> QLBMCase:
 
 
 CASE_BUILDERS: dict[str, Callable[..., QLBMCase]] = {
-    "abqlbm": build_abqlbm_4x8_0_case,
+    "abqlbm": build_abqlbm_8x4_d2q9_case,
     "msqlbm": build_msqlbm_case,
     "spacetime": build_spacetime_case,
 }

@@ -17,7 +17,7 @@ NOISE_KINDS = {
 
 
 def gate_arity(gate_name: str) -> int | None:
-    """Return the supported gate arity, or None for gates that are not not modeled"""
+    """Return the modeled gate arity, if the gate is supported."""
     for arity, gate_names in GATES_BY_ARITY.items():
         if gate_name in gate_names:
             return arity

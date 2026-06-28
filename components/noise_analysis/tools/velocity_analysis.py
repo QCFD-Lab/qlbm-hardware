@@ -198,12 +198,8 @@ def _velocity_profile_error_metrics(
     return metrics
 
 
-def _fraction(numerator: float, denominator: float) -> float:
-    return numerator / denominator if denominator > 0 else 0.0
-
-
 def velocity_profiles(fields: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
-    """Compute velocity profiles along x and y for both velocity components."""
+    """Compute x-axis and y-axis profiles for both velocity components."""
 
     ux_xy = fields["ux_xy"]
     uy_xy = fields["uy_xy"]
@@ -237,7 +233,7 @@ def compare_velocity_fields(
     lattice,
     density_floor: float = VELOCITY_PROFILE_DENSITY_FLOOR,
 ) -> dict[str, Any]:
-    """Compare velocity fields and profiles against a noiseless baseline."""
+    """Compare sampled velocity fields against a noiseless baseline."""
 
     baseline_fields = counts_to_velocity_fields(baseline_counts, lattice)
     noisy_fields = counts_to_velocity_fields(noisy_counts, lattice)
@@ -317,7 +313,7 @@ def analyze_velocity_counts(
     baseline_label: str = "noiseless",
     noisy_label: str = "noisy",
 ) -> dict[str, float]:
-    """Analyze and plot velocity profiles directly from velocity-resolved counts."""
+    """Compare sampled velocity counts and write the diagnostic outputs."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     comparison = compare_velocity_fields(
