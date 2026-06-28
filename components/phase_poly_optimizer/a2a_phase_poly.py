@@ -244,11 +244,14 @@ class A2APhasePoly:
     def optimize(
         self,
         circuit: Optional[QuantumCircuit] = None,
+        coupling_map: Optional[CouplingMap] = None,
         debug: Optional[bool] = None,
     ) -> QuantumCircuit:
         """
         Optimize all maximal {cx, rz} phase-polynomial blocks.
         """
+
+        _ = coupling_map  # Accepted for compatibility with the shared optimizer API.
 
         if debug is not None:
             self.debug = debug
