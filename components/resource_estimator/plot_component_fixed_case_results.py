@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 from typing import List
-
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
 
 import matplotlib
 

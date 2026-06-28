@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
@@ -14,9 +13,6 @@ from typing import Any, Dict, List, Sequence
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
-
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
 
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:

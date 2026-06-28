@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,20 +20,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
 
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
-
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
-from components.resource_estimator.benchmark_qlbm_resources_v2 import (  # noqa: E402
+from components.resource_estimator import QLBMResourceEstimator
+from components.resource_estimator.benchmark_qlbm_resources_v2 import (
     SECTION_BOUNDARY_PREFIX,
     json_safe,
     load_hardware_configs,
 )
-from components.resource_estimator.experiment_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (
     DEFAULT_ALGORITHMS,
     DEFAULT_CONFIG_PATH,
     DEFAULT_GRID_SIZES,
@@ -46,28 +42,28 @@ from components.resource_estimator.experiment_resource_sweeps import (  # noqa: 
     report_timing_warnings,
     select_names,
 )
-from qlbm import ABLattice, MSLattice, SpaceTimeLattice  # noqa: E402
-from qlbm.components.ab import (  # noqa: E402
+from qlbm import ABLattice, MSLattice, SpaceTimeLattice
+from qlbm.components.ab import (
     ABInitialConditions,
     ABReflectionOperator,
     ABStreamingOperator,
 )
-from qlbm.components.ms import (  # noqa: E402
+from qlbm.components.ms import (
     BounceBackReflectionOperator,
     MSInitialConditions,
     MSStreamingOperator,
     SpecularReflectionOperator,
     StreamingAncillaPreparation,
 )
-from qlbm.components.spacetime import (  # noqa: E402
+from qlbm.components.spacetime import (
     PointWiseSpaceTimeInitialConditions,
     PointWiseSpaceTimeReflectionOperator,
     SpaceTimeD2Q4CollisionOperator,
     SpaceTimeStreamingOperator,
 )
-from qlbm.lattice.geometry.shapes.block import Block  # noqa: E402
-from qlbm.tools.exceptions import LatticeException  # noqa: E402
-from qlbm.tools.utils import get_time_series  # noqa: E402
+from qlbm.lattice.geometry.shapes.block import Block
+from qlbm.tools.exceptions import LatticeException
+from qlbm.tools.utils import get_time_series
 
 
 DEFAULT_OUTPUT_DIR = (

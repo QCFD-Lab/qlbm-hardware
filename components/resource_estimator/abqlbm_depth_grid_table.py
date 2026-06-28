@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
@@ -14,22 +13,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
 
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
-
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
-from components.resource_estimator.benchmark_qlbm_resources_v2 import (  # noqa: E402
+from components.resource_estimator import QLBMResourceEstimator
+from components.resource_estimator.benchmark_qlbm_resources_v2 import (
     build_full_logical_circuit,
     build_sectioned_logical_circuit,
     json_safe,
     load_hardware_configs,
 )
-from qlbm import ABLattice  # noqa: E402
-from qlbm.components import (  # noqa: E402
+from qlbm import ABLattice
+from qlbm.components import (
     ABGridMeasurement,
     ABInitialConditions,
     ABQLBM,

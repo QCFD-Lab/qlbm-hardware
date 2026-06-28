@@ -6,7 +6,6 @@ import argparse
 import contextlib
 import csv
 import io
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -15,14 +14,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
 
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
-
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from components.phase_poly_optimizer.optimizer_benchmark_simulation import (  # noqa: E402
+from components.phase_poly_optimizer.optimizer_benchmark_simulation import (
     DEFAULT_PHASE_POLY_INTERMEDIATE_BASIS,
     OPTIMIZATION_LEVEL,
     SEED_TRANSPILER,
@@ -30,7 +26,7 @@ from components.phase_poly_optimizer.optimizer_benchmark_simulation import (  # 
     run_all_to_all_intermediate_native_phase_poly_pipeline,
     run_intermediate_native_phase_poly_pipeline,
 )
-from components.resource_estimator.experiment_resource_sweeps import (  # noqa: E402
+from components.resource_estimator.experiment_resource_sweeps import (
     DEFAULT_ALGORITHMS,
     build_experiment_case,
     make_case_spec,

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
@@ -18,9 +17,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
 COMPONENT_DIR = Path(__file__).resolve().parent
-
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/qlbm-matplotlib-cache")
-os.environ.setdefault("XDG_CACHE_HOME", "/private/tmp/qlbm-cache")
 
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT):
     if str(path) not in sys.path:

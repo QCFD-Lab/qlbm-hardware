@@ -9,8 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from components.resource_estimator import QLBMResourceEstimator  # noqa: E402
-from components.resource_estimator.benchmark_qlbm_resources_v2 import (  # noqa: E402
+from components.resource_estimator import QLBMResourceEstimator
+from components.resource_estimator.benchmark_qlbm_resources_v2 import (
     build_full_logical_circuit,
     build_sectioned_logical_circuit,
 )

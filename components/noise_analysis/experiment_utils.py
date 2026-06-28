@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -14,18 +13,12 @@ from qiskit_aer import AerSimulator
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 QLBM_SOURCE_ROOT = PROJECT_ROOT / "qlbm"
 QLBM_HARDWARE_ROOT = PROJECT_ROOT / "qlbm-hardware"
-
-os.environ.setdefault(
-    "MPLCONFIGDIR",
-    str(Path(__file__).resolve().parent / "output" / ".matplotlib"),
-)
-
 for path in (QLBM_SOURCE_ROOT, QLBM_HARDWARE_ROOT, Path(__file__).resolve().parent):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from components.noise_analysis.noise_models import build_noise_model  # noqa: E402
-from components.noise_analysis.qlbm_builders import CASE_BUILDERS, QLBMCase  # noqa: E402
+from components.noise_analysis.noise_models import build_noise_model
+from components.noise_analysis.qlbm_builders import CASE_BUILDERS, QLBMCase
 
 DEFAULT_CONFIG_PATH = (
     QLBM_HARDWARE_ROOT / "components" / "resource_estimator" / "config.json"
