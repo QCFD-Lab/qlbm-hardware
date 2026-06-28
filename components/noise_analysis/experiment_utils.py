@@ -1,4 +1,4 @@
-"""Shared setup and small helpers for QLBM noise experiments."""
+"""Shared setup, validation, and file I/O for QLBM noise experiments."""
 
 from __future__ import annotations
 
@@ -33,8 +33,7 @@ def load_hardware_configs(config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, 
 
 
 def load_hardware_config(hardware_name: str, config_path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
-    """Load one hardware config and fail with a useful message if it is missing."""
-
+    """Load one hardware config by name."""
     hardware_configs = load_hardware_configs(config_path)
     if hardware_name not in hardware_configs:
         raise ValueError(
@@ -45,8 +44,7 @@ def load_hardware_config(hardware_name: str, config_path: Path = DEFAULT_CONFIG_
 
 
 def require_hardware_names(hardware_configs: dict[str, dict[str, Any]], hardware_names: list[str]) -> None:
-    """Validate a non-empty list of hardware names against loaded configs."""
-
+    """Validate the selected hardware names."""
     if not hardware_names:
         raise ValueError("hardware_names must contain at least one hardware config.")
     unknown_hardware = [name for name in hardware_names if name not in hardware_configs]
@@ -58,8 +56,7 @@ def require_hardware_names(hardware_configs: dict[str, dict[str, Any]], hardware
 
 
 def deep_update(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
-    """Recursively update a nested dictionary in place."""
-
+    """Apply nested override values in place."""
     for key, value in updates.items():
         if isinstance(value, dict) and isinstance(base.get(key), dict):
             deep_update(base[key], value)
@@ -72,7 +69,7 @@ def load_hardware_configs_with_overrides(
     config_path: Path = DEFAULT_CONFIG_PATH,
     hardware_config_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Load hardware configs and apply experiment-local overrides."""
+    """Load hardware configs with optional experiment-local overrides."""
 
     hardware_configs = deepcopy(load_hardware_configs(config_path))
     for hardware_name, overrides in (hardware_config_overrides or {}).items():
@@ -92,7 +89,7 @@ def build_backend(
     noise_parameters: dict[str, Any],
     hardware_config: dict[str, Any],
 ) -> AerSimulator:
-    """Build the Aer backend for direct execution of a transpiled circuit."""
+    """Create the Aer backend used to sample a transpiled circuit."""
 
     noise_model = build_noise_model(
         kind=noise_kind,
@@ -108,8 +105,12 @@ def build_backend(
     return AerSimulator(**options, noise_model=noise_model)
 
 
-def sample_counts(backend: AerSimulator, circuit: QuantumCircuit, num_shots: int) -> dict[str, int]:
-    """Run one sampled circuit and return a plain counts dictionary."""
+def sample_counts(
+    backend: AerSimulator,
+    circuit: QuantumCircuit,
+    num_shots: int,
+) -> dict[str, int]:
+    """Sample a circuit and normalize Qiskit's counts object to ``dict``."""
     return dict(backend.run(circuit, shots=num_shots).result().get_counts())
 
 
@@ -128,7 +129,7 @@ def build_run_metadata(
     hardware_config: dict[str, Any],
     simulated_timesteps: list[int] | None = None,
 ) -> dict[str, Any]:
-    """Build metadata, omitting manual noise probabilities for noiseless runs."""
+    """Collect run metadata for reports and plot inputs."""
 
     metadata = {
         "algorithm_name": algorithm_name,
@@ -158,7 +159,7 @@ def build_run_metadata(
 
 
 def write_json(path: Path, payload: Any) -> None:
-    """Write a JSON file after converting non-serializable values."""
+    """Write JSON after reducing circuit objects to resource summaries."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as file:
@@ -166,7 +167,7 @@ def write_json(path: Path, payload: Any) -> None:
 
 
 def write_lattice_json(path: Path, lattice: Any) -> None:
-    """Write the lattice JSON string produced by the QLBM lattice object."""
+    """Write the lattice JSON produced by the QLBM lattice object."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as file:
@@ -174,7 +175,7 @@ def write_lattice_json(path: Path, lattice: Any) -> None:
 
 
 def json_safe(value: Any) -> Any:
-    """Convert report objects into JSON-serializable summaries."""
+    """Reduce report values to JSON-serializable data."""
 
     if isinstance(value, QuantumCircuit):
         return {
@@ -192,7 +193,7 @@ def json_safe(value: Any) -> Any:
 
 
 def require_compatible(report: dict[str, Any]) -> None:
-    """Raise if the estimator reports hardware incompatibility."""
+    """Raise when resource estimation reports an incompatible circuit."""
 
     if report.get("transpile_error"):
         raise RuntimeError(report["transpile_error"])
@@ -205,7 +206,7 @@ def require_compatible(report: dict[str, Any]) -> None:
 
 
 def build_case(algorithm_name: str, num_timesteps: int, measure_velocity_qubits: bool = False) -> QLBMCase:
-    """Build a QLBM case, optionally using velocity-resolved AB measurement."""
+    """Build one configured QLBM case for an experiment."""
 
     if algorithm_name not in CASE_BUILDERS:
         raise ValueError(
@@ -225,7 +226,7 @@ def build_case(algorithm_name: str, num_timesteps: int, measure_velocity_qubits:
 
 
 def safe_path_name(value: str) -> str:
-    """Return a lowercase filesystem-safe name without shortening the input."""
+    """Make a filesystem safe lowercase name without truncating it."""
 
     sanitized = "".join(
         character.lower() if character.isalnum() else "_"

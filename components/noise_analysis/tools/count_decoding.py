@@ -6,25 +6,17 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class DecodedGridMeasurement:
-    """Decoded lattice grid coordinates from a Qiskit count key."""
-
+    """Grid coordinates decoded from a Qiskit count key."""
     x: int
     y: int
 
 
 @dataclass(frozen=True)
 class DecodedGridVelocityMeasurement:
-    """Decoded lattice grid coordinates and velocity channel from a count key."""
-
+    """Grid coordinates and velocity channel decoded from a count key."""
     x: int
     y: int
     velocity: int
-
-
-def clean_count_key(count_key: str) -> str:
-    """Return a count key without register separators."""
-
-    return count_key.replace(" ", "")
 
 
 def read_little_endian_register(bitstring: str, start: int, size: int) -> int:
@@ -54,8 +46,7 @@ def read_little_endian_register(bitstring: str, start: int, size: int) -> int:
 
 
 def grid_register_sizes(lattice) -> tuple[int, int]:
-    """Return the x/y grid register sizes for a 2D lattice."""
-
+    """Get the x/y grid-register sizes for a 2D lattice."""
     if lattice.num_dims != 2:
         raise ValueError("Count decoding currently expects a 2D lattice.")
     return (
@@ -65,7 +56,7 @@ def grid_register_sizes(lattice) -> tuple[int, int]:
 
 
 def grid_shape(lattice) -> tuple[int, int]:
-    """Return the x/y field shape for a 2D lattice."""
+    """Get the x/y field shape for a 2D lattice."""
 
     grid_register_sizes(lattice)
     return lattice.num_gridpoints[0] + 1, lattice.num_gridpoints[1] + 1
@@ -73,8 +64,7 @@ def grid_shape(lattice) -> tuple[int, int]:
 
 def decode_grid_count(count_key: str, lattice) -> DecodedGridMeasurement:
     """Decode x/y grid coordinates from a count key."""
-
-    bitstring = clean_count_key(count_key)
+    bitstring = count_key.replace(" ", "")
     x_bits, y_bits = grid_register_sizes(lattice)
     x = read_little_endian_register(bitstring, 0, x_bits)
     y = read_little_endian_register(bitstring, x_bits, y_bits)
@@ -84,7 +74,7 @@ def decode_grid_count(count_key: str, lattice) -> DecodedGridMeasurement:
 def decode_grid_velocity_count(count_key: str, lattice) -> DecodedGridVelocityMeasurement:
     """Decode x/y grid coordinates and velocity channel from a count key."""
 
-    bitstring = clean_count_key(count_key)
+    bitstring = count_key.replace(" ", "")
     x_bits, y_bits = grid_register_sizes(lattice)
     velocity_bits = lattice.num_velocity_qubits
     x = read_little_endian_register(bitstring, 0, x_bits)

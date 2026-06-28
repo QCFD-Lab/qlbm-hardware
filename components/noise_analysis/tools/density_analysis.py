@@ -23,8 +23,7 @@ def counts_to_density_field(counts: Mapping[str, int | float], lattice) -> np.nd
 
 
 def normalized_density(field: np.ndarray) -> np.ndarray:
-    """Normalize a density/count field by its total mass."""
-
+    """Normalize a density or count field by total mass."""
     total = float(np.sum(field))
     if total <= 0:
         return np.zeros_like(field, dtype=float)
@@ -32,7 +31,7 @@ def normalized_density(field: np.ndarray) -> np.ndarray:
 
 
 def density_profiles(field: np.ndarray, normalize: bool = True) -> dict[str, np.ndarray]:
-    """Compute x-directed density profiles from a 2D density/count field."""
+    """Compute x-directed profiles from a 2D density field."""
 
     density = normalized_density(field) if normalize else field.astype(float)
     if density.ndim != 2:
@@ -54,7 +53,7 @@ def compare_density_fields(
     noisy_field: np.ndarray,
     normalize: bool = True,
 ) -> dict[str, Any]:
-    """Compare noiseless and noisy density fields with scalar error metrics."""
+    """Compare two density fields and profile projections."""
 
     if baseline_field.shape != noisy_field.shape:
         raise ValueError(
@@ -156,7 +155,7 @@ def analyze_density_counts(
     noisy_label: str = "noisy",
     normalize: bool = True,
 ) -> dict[str, Any]:
-    """Analyze density differences directly from sampled grid-measurement counts."""
+    """Compare sampled density counts and write the diagnostic outputs."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     baseline_field = counts_to_density_field(baseline_counts, lattice)
@@ -188,8 +187,12 @@ def analyze_density_counts(
     return comparison["metrics"]
 
 
-def save_density_error_growth(output_dir: Path, step_metrics: list[dict[str, Any]], noisy_label: str) -> None:
-    """Save CSV and plots of density-error metrics versus timestep."""
+def save_density_error_growth(
+    output_dir: Path,
+    step_metrics: list[dict[str, Any]],
+    noisy_label: str,
+) -> None:
+    """Write timestep density-error summaries."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / "density_error_vs_timestep.csv"
@@ -256,7 +259,7 @@ def save_depolarizing_probability_sweep(
     sweep_metrics: list[dict[str, Any]],
     timestep: int,
 ) -> None:
-    """Save CSV and plots for a depolarizing-probability density sweep."""
+    """Write density-error summaries for a depolarizing-probability sweep."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     fieldnames = [

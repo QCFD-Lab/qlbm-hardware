@@ -149,8 +149,8 @@ class QLBMResourceEstimator:
         """
         Return resource data for a circuit that has already been transpiled.
 
-        This method intentionally does not invoke Qiskit's transpiler. The supplied
-        circuit is treated as the physical circuit to validate, calculate time, and compact by removing idle qubits.
+        No Qiskit transpilation is run here. The supplied circuit is treated as the
+        physical circuit for validation, timing, and idle-qubit compaction.
         """
         transpiled_metrics = self.extract_metrics(circuit)
         transpiled_compact_qc = self.compact_circuit(circuit)

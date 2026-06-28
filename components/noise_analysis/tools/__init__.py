@@ -1,9 +1,8 @@
-"""Analysis helpers for QLBM hardware noise experiments."""
+"""Density, velocity, and count-decoding tools for QLBM noise experiments."""
 
 from .count_decoding import (
     DecodedGridMeasurement,
     DecodedGridVelocityMeasurement,
-    clean_count_key,
     decode_grid_count,
     decode_grid_velocity_count,
     grid_register_sizes,
@@ -28,7 +27,6 @@ from .velocity_analysis import (
 __all__ = [
     "analyze_density_counts",
     "analyze_velocity_counts",
-    "clean_count_key",
     "compare_density_fields",
     "compare_velocity_fields",
     "counts_to_density_field",
